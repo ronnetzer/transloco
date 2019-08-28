@@ -1,4 +1,4 @@
-import { MessageFormatTranspiler } from '../../../public-api';
+import { MessageFormatTranspiler } from '../lib/messageformat.transpiler';
 
 describe('MessageFormatTranslocoParser', () => {
   const parser = new MessageFormatTranspiler();

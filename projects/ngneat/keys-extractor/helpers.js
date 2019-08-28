@@ -38,5 +38,6 @@ function buildObjFromPath(path) {
 
 module.exports = {
   mergeDeep,
-  buildObjFromPath
+  buildObjFromPath,
+  isObject
 };

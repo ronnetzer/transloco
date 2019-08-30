@@ -1,0 +1,39 @@
+<ng-template let-t transloco>
+  {{ t.1 }} {{t.2}} {{t[dontgrab1]}}
+</ng-template>
+<ng-template transloco let-translate>
+  {{ translate['3'] }} {{ translate.4}} {{ translate[dontgrab2] }}
+</ng-template>
+<ng-container *transloco="let t">
+  {{ t.5 }} {{ t['6'] }} {{ t["7"] }} {{ t[dontgrab3]}}
+</ng-container>
+<ng-container *transloco="let translate">
+  {{ translate.8 }} {{ translate['9'] }} {{ translate["10"] }} {{ translate[dontgrab4] }}
+</ng-container>
+<span transloco="11"></span>
+<div transloco="12" [translocoParams]="{value: 'hello'}"></div>
+<div [transloco]="dontgrab5"></div>
+<span>{{ '13' | transloco}}</span>
+<span>{{ "14" | transloco }}</span>
+<span>{{ '15' | transloco: { value: 'dynamic'} }}</span>
+<span [hello]="'16' | transloco"></span>
+<span [hello]='"17" | transloco'></span>
+<span [attr.hello]=" '18' | transloco"></span>
+<span [hello]=" dontgrab6 | transloco"></span>
+<span title="{{ '19' | transloco }}"></span>
+<span title='{{ "20" | transloco }}'></span>
+<ng-container *transloco="let t; read: 'admin'">
+  {{t.21}} // {admin: {title: ''}}
+</ng-container>
+<ng-container *transloco="let t read: 'admin'">
+  {{t.22}} // {admin: {22: ''}} {{t.23.24}} // {admin: {23: {24: ''}}}
+</ng-container>
+<ng-template let-t transloco read="admin">
+  {{ t.25 }}
+</ng-template>
+<ng-template let-t transloco [read]="'admin'">
+  {{ t.26 }}
+</ng-template>
+<span>{{ '27.28.29' | transloco}}</span>
+<span transloco="30.31"></span>
+<div transloco="32.33" [translocoParams]="{value: 'hello'}"></div>

@@ -36,8 +36,20 @@ function buildObjFromPath(path) {
   return obj;
 }
 
+function sanitizeForRegex(str) {
+  return str.split('').map(char => (['$', '^'].includes(char) ? `\\${char}` : char)).join('');
+}
+
+function toCamelCase(str) {
+  return str
+    .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => (index === 0 ? word.toLowerCase() : word.toUpperCase()))
+    .replace(/\s+|_|-|\//g, '');
+}
+
 module.exports = {
   mergeDeep,
   buildObjFromPath,
-  isObject
+  isObject,
+  sanitizeForRegex,
+  toCamelCase
 };

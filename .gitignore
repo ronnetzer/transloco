@@ -7,6 +7,8 @@
 # Only exists if Bazel was run
 /bazel-out
 
+# keys-manager
+/projects/ngneat/transloco-keys-manager/assets
 # dependencies
 /node_modules
 node_modules

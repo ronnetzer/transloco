@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 const { buildTranslationFiles } = require('./keysBuilder');
-const { findMissingKeys } = require('./findMissingKeys');
+const { findMissingKeys } = require('./keysDetective');
 const { toCamelCase } = require('./helpers');
 const path = require('path');
-
 const ACTIONS = { EXTRACT: '--extract', FIND_MISSING: '--find-missing' };
 const [action, ...argv] = process.argv.slice(2);
 const argvMap = argv.reduce((acc, arg, i, arr) => {
   if (arg.includes('--')) {
     const key = toCamelCase(arg.replace('--', ''));
-    acc[key] = arr[i + 1];
+    const isFlag = arr[i + 1] === undefined || arr[i + 1].includes('--');
+    acc[key] = isFlag ? true : arr[i + 1];
   }
   return acc;
 }, {});

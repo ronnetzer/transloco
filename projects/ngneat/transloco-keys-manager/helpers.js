@@ -37,7 +37,10 @@ function buildObjFromPath(path) {
 }
 
 function sanitizeForRegex(str) {
-  return str.split('').map(char => (['$', '^'].includes(char) ? `\\${char}` : char)).join('');
+  return str
+    .split('')
+    .map(char => (['$', '^', '/'].includes(char) ? `\\${char}` : char))
+    .join('');
 }
 
 function toCamelCase(str) {
@@ -46,10 +49,18 @@ function toCamelCase(str) {
     .replace(/\s+|_|-|\//g, '');
 }
 
+function countKeysRecursively(obj) {
+  return Object.keys(obj).reduce(
+    (acc, curr) => (isObject(obj[curr]) ? ++acc + countKeysRecursively(obj[curr]) : ++acc),
+    0
+  );
+}
+
 module.exports = {
   mergeDeep,
   buildObjFromPath,
   isObject,
   sanitizeForRegex,
-  toCamelCase
+  toCamelCase,
+  countKeysRecursively
 };

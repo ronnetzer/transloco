@@ -7,7 +7,8 @@ const regexs = {
   directive: /\stransloco="(?<key>[^"]*)"/g,
   pipe: /{{\s*(?:'|")(?<key>[^}\r\n]*)(?:'|")\s*\|\s*(?:transloco)/g,
   bindingPipe: /=(?:'|")(?:\s*(?:'|")(?<key>[^}\r\n]*)(?:'|")\s*\|)\s*(?:transloco)/g,
-  fileLang: /(?<fileLang>[^./]*)\.json/,
+  fileLang: outputPath =>
+    new RegExp(`${sanitizeForRegex(outputPath)}\\/(?<scope>(?:[^\\.\\/]*\\/)*)(?<fileLang>[^./]*)\\.json`),
   serviceInjection: /[^]*(?=(?:private|protected|public)\s+(?<serviceName>[^,:()]+)\s*:\s*(?:TranslocoService\s*(?:,|\))))[^]*/g,
   translationCalls: name =>
     new RegExp(

@@ -9,12 +9,14 @@ const messages = {
     keysFound: (keysCount, filesCount) =>
       `- ${keysCount} keys were found in ${filesCount} ${filesCount > 1 ? 'files' : 'file'}.`,
     startBuild: langsCount => `Starting Translation ${langsCount > 1 ? 'Files' : 'File'} Build`,
-    startSearch: 'Starting Search For Missing Keys',
+    startSearch: 'Staring Search For Missing Keys',
     extract: 'Extracting Template and Component Keys',
     creatingFiles: 'Creating new translation files',
-    merged: (langs, files) =>
-      `Existing ${langs.join(',')} translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
+    merged: files => `Existing translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
     checkMissing: 'Checking for missing keys',
+    pathDoesntExists: `The path provided for the translation files doesn't exists! Exiting script...`,
+    summary: 'Summary',
+    noMissing: 'No missing keys were found',
     done: 'Done!'
   },
   ru: {
@@ -24,12 +26,13 @@ const messages = {
     keysFound: (keysCount, filesCount) =>
       `- В ${filesCount} ${filesCount > 1 ? 'файлах' : 'файле'} найдено ${keysCount} ключей.`,
     startBuild: langsCount => `Начало сборки ${langsCount > 1 ? 'файлов' : 'файла'} перевода`,
-    startSearch: 'Starting Search For Missing Keys',
+    startSearch: 'Staring Search For Missing Keys',
     extract: 'Extracting Template and Component Keys',
     creatingFiles: 'Создание новых файлов перевода',
-    merged: (langs, files) =>
-      `Existing ${langs.join(',')} translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
+    merged: files => `Existing translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
     checkMissing: 'Checking for missing keys',
+    summary: 'Summary',
+    noMissing: 'No missing keys were found',
     done: 'Готово!'
   },
   fr: {
@@ -39,12 +42,13 @@ const messages = {
     keysFound: (keysCount, filesCount) =>
       `- ${keysCount} clés ${filesCount} ${filesCount > 1 ? 'fichiers' : 'fichier'}.`,
     startBuild: langsCount => `Initialisation de la traduction des ${langsCount > 1 ? 'fichiers' : 'fichier'}`,
-  startSearch: 'Starting Search For Missing Keys',
+    startSearch: 'Staring Search For Missing Keys',
     extract: 'Extracting Template and Component Keys',
     creatingFiles: 'Création des nouveaux fichiers de traduction',
-    merged: (langs, files) =>
-      `Existing ${langs.join(',')} translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
+    merged: files => `Existing translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
     checkMissing: 'Checking for missing keys',
+    summary: 'Summary',
+    noMissing: 'No missing keys were found',
     done: 'Fini!'
   },
   es: {
@@ -54,12 +58,13 @@ const messages = {
     keysFound: (keysCount, filesCount) =>
       `- ${keysCount} llaves fueron encontradas en ${filesCount} ${filesCount > 1 ? 'archivos' : 'archivo'}.`,
     startBuild: langsCount => `Iniciando la construcción del ${langsCount > 1 ? 'archivos' : 'archivo'} de traducción`,
-    startSearch: 'Starting Search For Missing Keys',
+    startSearch: 'Staring Search For Missing Keys',
     extract: 'Extracting Template and Component Keys',
     creatingFiles: 'Creando nuevos archivos de traducción',
-    merged: (langs, files) =>
-      `Existing ${langs.join(',')} translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
+    merged: files => `Existing translation file${files.length > 1 ? 's were' : ' was'} found and merged 🧙`,
     checkMissing: 'Checking for missing keys',
+    summary: 'Summary',
+    noMissing: 'No missing keys were found',
     done: '¡Completo!'
   },
   ja: {},

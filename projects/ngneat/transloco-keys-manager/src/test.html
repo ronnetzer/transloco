@@ -37,3 +37,12 @@
 <span>{{ '27.28.29' | transloco}}</span>
 <span transloco="30.31"></span>
 <div transloco="32.33" [translocoParams]="{value: 'hello'}"></div>
+<ng-template let-t transloco>
+  {{ t.todos.inner }}
+</ng-template>
+<ng-template let-t transloco>
+  {{ t.mf.inner }}
+</ng-template>
+<ng-template let-t transloco read="mf">
+  {{ t.another }}
+</ng-template>

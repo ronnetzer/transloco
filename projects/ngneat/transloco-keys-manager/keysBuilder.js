@@ -10,18 +10,17 @@ const [localLang] = require('os-locale')
   .sync()
   .split('-');
 const messages = require('./messages').getMessages(localLang);
-const { mergeDeep, buildObjFromPath, isObject } = require('./helpers');
+const { mergeDeep, buildObjFromPath, isObject, toCamelCase, countKeysRecursively } = require('./helpers');
 const { regexs } = require('./regexs');
-const TEMPLATE_TYPE = { STRUCTURAL: 0, NG_TEMPLATE: 1 };
+
 let spinner;
+/** Template type ENUM */
+const TEMPLATE_TYPE = { STRUCTURAL: 0, NG_TEMPLATE: 1 };
 
 inquirer.registerPrompt('directory', promptDirectory);
 inquirer.registerPrompt('file-tree-selection', inquirerFileTreeSelection);
 
-function countKeys(obj) {
-  return Object.keys(obj).reduce((acc, curr) => (isObject(obj[curr]) ? ++acc + countKeys(obj[curr]) : ++acc), 0);
-}
-
+/** Get the keys from an ngTemplate based html code. */
 function getTemplateBasedKeys(rgxResult, templateType) {
   let scopeKeys, read, readSearch, varName;
   const [matchedStr] = rgxResult;
@@ -37,31 +36,32 @@ function getTemplateBasedKeys(rgxResult, templateType) {
   return { scopeKeys, read, varName };
 }
 
-function extractTSKeys({ src, keepFlat = [] }) {
-  const srcPath = `${process.cwd()}/${src}`;
-  const keys = {};
-  let fileCount = 0;
+/** Read a utf-8 file synchronously  */
+function readFile(file) {
+  return fs.readFileSync(file, { encoding: 'UTF-8' });
+}
+
+/** Init the values needed for extraction */
+function initExtraction(src) {
+  return { srcPath: `${process.cwd()}/${src}`, keys: { __global: {} }, fileCount: 0 };
+}
+/**
+ * Extract all the keys that exists in the ts files. (no dynamic)
+ */
+function extractTSKeys({ src, keepFlat = [], scopes }) {
+  let { srcPath, keys, fileCount } = initExtraction(src);
   return new Promise(resolve => {
     find
       .eachfile(/\.ts$/, srcPath, file => {
+        /** Filter out spec files */
         if (file.endsWith('.spec.ts')) return;
         fileCount++;
-        const str = fs.readFileSync(file, { encoding: 'UTF-8' });
+        const str = readFile(file);
         const service = regexs.serviceInjection.exec(str);
         if (service) {
           /** service translationCalls regex */
           const rgx = regexs.translationCalls(service.groups.serviceName);
-          let result = rgx.exec(str);
-          while (result) {
-            const [key, ...inner] = result.groups.key.split('.');
-            if (keepFlat.includes(key)) {
-              keys[result.groups.key] = '';
-            } else {
-              const value = inner.length ? buildObjFromPath(inner) : '';
-              keys[key] = keys[key] && isObject(value) ? mergeDeep(keys[key], value) : value;
-            }
-            result = rgx.exec(str);
-          }
+          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes });
         }
       })
       .end(() => {
@@ -70,15 +70,34 @@ function extractTSKeys({ src, keepFlat = [] }) {
   });
 }
 
-function extractTemplateKeys({ src, keepFlat = [] }) {
-  const srcPath = `${process.cwd()}/${src}`;
-  const keys = {};
-  let fileCount = 0;
+/**
+ * Insert a given key to the right place in the keys map.
+ * 1. If this is a scoped key, enter to the correct scope.
+ * 2. If this is a global key, enter to the reserved '__global' key in the map.
+ */
+function insertValueToKeys({ inner, keys, scopes, key }) {
+  const value = inner.length ? buildObjFromPath(inner) : '';
+  const scope = scopes.keysMap[key];
+  if (scope) {
+    if (!keys[scope]) {
+      keys[scope] = {};
+    }
+    keys[scope] = keys[scope] && isObject(value) ? mergeDeep(keys[scope], value) : value;
+  } else {
+    keys.__global[key] = keys.__global[key] && isObject(value) ? mergeDeep(keys.__global[key], value) : value;
+  }
+}
+
+/**
+ * Extract all the keys that exists in the template files.
+ */
+function extractTemplateKeys({ src, keepFlat = [], scopes }) {
+  let { srcPath, keys, fileCount } = initExtraction(src);
   return new Promise(resolve => {
     find
       .eachfile(/\.html$/, srcPath, file => {
         fileCount++;
-        const str = fs.readFileSync(file, { encoding: 'UTF-8' });
+        const str = readFile(file);
         let result;
         /** structural directive and ng-template */
         [regexs.structural, regexs.template].forEach((rgx, index) => {
@@ -87,6 +106,7 @@ function extractTemplateKeys({ src, keepFlat = [] }) {
             const { scopeKeys, read, varName } = getTemplateBasedKeys(result, index);
             scopeKeys &&
               scopeKeys.forEach(rawKey => {
+                /** The raw key may contain square braces we need to align it to '.' */
                 let [key, ...inner] = rawKey
                   .trim()
                   .replace(/\[/g, '.')
@@ -98,25 +118,14 @@ function extractTemplateKeys({ src, keepFlat = [] }) {
                   inner.unshift(key);
                   key = read;
                 }
-                const value = inner.length ? buildObjFromPath(inner) : '';
-                keys[key] = keys[key] && isObject(value) ? mergeDeep(keys[key], value) : value;
+                insertValueToKeys({ inner, scopes, keys, key });
               });
             result = rgx.exec(str);
           }
         });
         /** directive & pipe */
         [regexs.directive, regexs.pipe, regexs.bindingPipe].forEach(rgx => {
-          result = rgx.exec(str);
-          while (result) {
-            const [key, ...inner] = result.groups.key.split('.');
-            if (keepFlat.includes(key)) {
-              keys[result.groups.key] = '';
-            } else {
-              const value = inner.length ? buildObjFromPath(inner) : '';
-              keys[key] = keys[key] && isObject(value) ? mergeDeep(keys[key], value) : value;
-            }
-            result = rgx.exec(str);
-          }
+          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes });
         });
       })
       .end(() => {
@@ -125,49 +134,92 @@ function extractTemplateKeys({ src, keepFlat = [] }) {
   });
 }
 
-function createJson(outputPath, lang, json) {
-  fs.writeFileSync(`${outputPath}/${lang.trim()}.json`, json, 'utf8');
+/**
+ * Iterates over a given regex until there a no results and adds all the keys found to the map.
+ */
+function iterateRegex({ rgx, keys, str, keepFlat, scopes }) {
+  let result = rgx.exec(str);
+  while (result) {
+    const [key, ...inner] = result.groups.key.split('.');
+    if (keepFlat.includes(key)) {
+      keys[result.groups.key] = '';
+    } else {
+      insertValueToKeys({ inner, scopes, keys, key });
+    }
+    result = rgx.exec(str);
+  }
+  return keys;
 }
 
-function verifyOutputDir(outputPath) {
+/**
+ * Creates a new translation json file.
+ */
+function createJson(outputPath, json) {
+  fs.writeFileSync(outputPath, json, 'utf8');
+}
+
+/**
+ * Verifies that the output dir (and sub-dirs) exists, if not create them.
+ */
+function verifyOutputDir(outputPath, folders) {
+  const scopes = folders.filter(key => key !== '__global');
   if (!fs.existsSync(outputPath)) {
     fs.mkdirSync(outputPath, { recursive: true });
   }
+  for (const scope of scopes) {
+    if (!fs.existsSync(`${outputPath}/${scope}`)) {
+      fs.mkdirSync(`${outputPath}/${scope}`, { recursive: true });
+    }
+  }
 }
 
+/** Create/Merge the translation files */
 function createFiles({ keys, langs, outputPath }) {
   spinner = ora().start(`${messages.creatingFiles} 🗂`);
-  verifyOutputDir(outputPath);
-  const existingFiles = glob.sync(`${outputPath}/*.json`);
-  let existingLangs;
-  let langArr = langs.split(',').map(l => l.trim());
+  const scopes = Object.keys(keys);
+  const langArr = langs.split(',').map(l => l.trim());
+  /** Build an array of the expected translation files (based on all the scopes and langs) */
+  let expectedFiles = scopes.reduce((files, scope) => {
+    langArr.forEach(lang => {
+      const path = scope === '__global' ? outputPath : `${outputPath}/${scope}`;
+      files.push(`${path}/${lang}.json`);
+    });
+    return files;
+  }, []);
+
+  verifyOutputDir(outputPath, scopes);
+  /** An array of the existing translation files in the output dir */
+  const currentFiles = glob.sync(`${outputPath}/**/*.json`);
   /** iterate over the json files and merge the keys */
-  if (existingFiles.length) {
-    existingLangs = [];
-    for (const fileName of existingFiles) {
+  if (currentFiles.length) {
+    for (const fileName of currentFiles) {
       /** extract the lang name from the file */
-      const { fileLang } = regexs.fileLang.exec(fileName).groups;
-      existingLangs.push(`'${fileLang}'`);
-      /** remove this lang from the langs array since the file already exists */
-      langArr = langArr.filter(lang => lang !== fileLang);
+      const { scope } = regexs.fileLang(outputPath).exec(fileName).groups;
+      /** remove this file from the expectedFiles array since the file already exists */
+      expectedFiles = expectedFiles.filter(f => f !== fileName);
       /** Read and write the merged json */
-      const file = fs.readFileSync(fileName, { encoding: 'UTF-8' });
-      const merged = mergeDeep({}, keys, JSON.parse(file));
+      const file = readFile(fileName);
+      const merged = mergeDeep({}, scope ? keys[scope] : keys.__global, JSON.parse(file));
       fs.writeFileSync(fileName, JSON.stringify(merged, null, 2), { encoding: 'UTF-8' });
     }
   }
   /** If there are items in the array, that means that we need to create missing translation files */
-  if (langArr.length) {
-    const json = JSON.stringify(keys, null, 2);
-    langArr.forEach(lang => createJson(outputPath, lang, json));
+  if (expectedFiles.length) {
+    expectedFiles.forEach(fileName => {
+      const { scope } = regexs.fileLang(outputPath).exec(fileName).groups;
+      const bla = scope ? scope.slice(0, -1) : '__global';
+      const json = JSON.stringify(keys[bla], null, 2);
+      createJson(fileName, json);
+    });
   }
   spinner.succeed();
-  if (existingLangs) {
-    spinner.succeed(messages.merged(existingLangs, existingFiles));
+  if (currentFiles.length) {
+    spinner.succeed(messages.merged(currentFiles));
   }
-  console.log(`\n           🌵 ${messages.done} 🌵`);
+  console.log(`\n              🌵 ${messages.done} 🌵`);
 }
 
+/** Build the keys object */
 function buildKeys(options) {
   return Promise.all([extractTemplateKeys(options), extractTSKeys(options)]).then(([template, ts]) => {
     const keys = mergeDeep({}, template.keys, ts.keys);
@@ -175,6 +227,28 @@ function buildKeys(options) {
   });
 }
 
+/** Extract the scope mapping from the transloco config */
+function getScopesMap(configPath) {
+  if (!configPath) {
+    return { keysMap: {} };
+  }
+  const configFile = readFile(configPath);
+  const scopeMapping = /scopeMapping[\s\r\t\n]*:[\s\r\t\n]*(?<scopes>{[^}]*})/g.exec(configFile);
+  let scopes = '{}';
+  if (scopeMapping) {
+    scopes = scopeMapping.groups.scopes;
+  }
+  const sanitized = scopes.trim().replace(/'/g, '"');
+  const map = JSON.parse(`${sanitized}`);
+  const keysMap = Object.keys(map).reduce((acc, key) => {
+    const mappedScope = toCamelCase(map[key]);
+    acc[mappedScope] = key;
+    return acc;
+  }, {});
+  return { keysMap };
+}
+
+/** The main function, collects the settings and starts the files build. */
 function buildTranslationFiles({ argvMap, basePath }) {
   const queries = [
     {
@@ -196,13 +270,13 @@ function buildTranslationFiles({ argvMap, basePath }) {
       default: false,
       name: 'hasScope',
       message: messages.hasScope,
-      when: () => argvMap.config || !argvMap.noScope
+      when: () => !(argvMap.config || argvMap.noScope)
     },
     {
       type: 'file-tree-selection',
       name: 'config',
       messages: messages.config,
-      when: ({ hasScope }) => argvMap.config || (hasScope && !argvMap.noScope)
+      when: ({ hasScope }) => !argvMap.noScope && (!argvMap.config || hasScope)
     },
     {
       type: 'input',
@@ -215,27 +289,33 @@ function buildTranslationFiles({ argvMap, basePath }) {
       type: 'input',
       name: 'keepFlat',
       message: messages.keepFlat,
-      when: () => !argvMap.keepFlat
+      when: () => !argvMap.noFlat && !argvMap.keepFlat
     }
   ];
   inquirer
     .prompt(queries)
     .then(input => {
+      /** Merge cli input, argv and defaults */
       const src = input.src || argvMap.src || 'src';
       const langs = input.langs || argvMap.langs;
-      const output = input.output || argvMap.output || 'assets/i18n';
+      let output = input.output || argvMap.output || 'assets/i18n';
+      output = output.endsWith('/') ? output.slice(0, -1) : output;
+      const scopes = getScopesMap(input.config || argvMap.config);
       let keepFlat = input.keepFlat || argvMap.keepFlat;
       keepFlat = keepFlat ? keepFlat.split(',').map(l => l.trim()) : [];
-      console.log('\x1b[4m%s\x1b[0m', `\n${messages.startBuild(langs.length)} 👷️🏗\n`);
+
+      console.log('\x1b[4m%s\x1b[0m', `\n${messages.startBuild(langs.length)} 👷🏗\n`);
       spinner = ora().start(`${messages.extract} 🗝`);
-      const options = { src, keepFlat };
+      const options = { src, keepFlat, scopes };
       buildKeys(options).then(({ keys, fileCount }) => {
         spinner.succeed(`${messages.extract} 🗝`);
-        console.log(`${messages.keysFound(countKeys(keys), fileCount)}`);
+        /** Count all the keys found and reduce the scopes & global keys */
+        const keysFound = countKeysRecursively(keys) - Object.keys(keys).length;
+        console.log(`${messages.keysFound(keysFound, fileCount)}`);
         createFiles({ keys, langs, outputPath: `${process.cwd()}/${output}` });
       });
     })
     .catch(e => console.log(e));
 }
 
-module.exports = { buildTranslationFiles, buildKeys };
+module.exports = { buildTranslationFiles, buildKeys, getScopesMap, readFile };

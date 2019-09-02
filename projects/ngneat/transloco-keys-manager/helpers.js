@@ -20,7 +20,7 @@ function mergeDeep(target, ...sources) {
   return mergeDeep(target, ...sources);
 }
 
-function buildObjFromPath(path) {
+function buildObjFromPath(path, value) {
   const obj = {};
   let current = obj;
   while (path.length > 1) {
@@ -32,7 +32,7 @@ function buildObjFromPath(path) {
     current = current[head];
   }
   const [last] = path;
-  current[last] = '';
+  current[last] = value;
   return obj;
 }
 

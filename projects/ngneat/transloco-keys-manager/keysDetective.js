@@ -16,6 +16,51 @@ let spinner;
 
 inquirer.registerPrompt('directory', promptDirectory);
 
+const queries = basePath => [
+  {
+    type: 'directory',
+    name: 'src',
+    message: messages.src,
+    basePath
+  },
+  {
+    type: 'directory',
+    name: 'i18n',
+    message: messages.translationsLocation,
+    basePath
+  },
+  {
+    type: 'confirm',
+    default: false,
+    name: 'hasScope',
+    message: messages.hasScope
+  },
+  {
+    type: 'file-tree-selection',
+    name: 'configPath',
+    messages: messages.config
+  },
+  {
+    type: 'confirm',
+    default: true,
+    name: 'addMissing',
+    message: messages.addMissing
+  },
+  {
+    type: 'input',
+    name: 'defaultValue',
+    default: '""',
+    message: messages.defaultValue,
+    when: ({ addMissing }) => addMissing
+  }
+];
+const defaultConfig = {
+  src: 'src',
+  i18n: 'assets/i18n',
+  addMissing: true,
+  defaultValue: '""'
+};
+
 function compareKeysToFiles({ keys, i18nPath }) {
   spinner = ora().start(`${messages.checkMissing} ✨`);
   const result = {};
@@ -46,76 +91,56 @@ function compareKeysToFiles({ keys, i18nPath }) {
     }
   }
   spinner.succeed(`${messages.checkMissing} ✨`);
-  console.log('\n             🏁', `\x1b[4m${messages.summary}\x1b[0m`, '🏁');
-  const resultFiles = Object.keys(result);
+  console.log('\n              🏁', `\x1b[4m${messages.summary}\x1b[0m`, '🏁');
+  const resultFiles = Object.keys(result).filter(rf => {
+    const { missing, extra } = result[rf];
+    return missing.length || extra.length;
+  });
   if (resultFiles.length > 0) {
     for (let i = 0; i < resultFiles.length; i++) {
-      const resultFileSummary = result[resultFiles[i]];
+      const { missing, extra } = result[resultFiles[i]];
+      const hasMissing = missing.length > 0;
+      const hasExtra = extra.length > 0;
+      if (!(hasExtra || hasMissing)) continue;
       console.log(`\x1b[4m${i + 1}. ${resultFiles[i]}.json\x1b[0m`);
-      if (resultFileSummary.missing.length) {
+      if (hasMissing) {
         console.log('We found the following missing keys in this file:');
-        console.log(resultFileSummary.missing.map(d => `'${d.path.join('.')}'`).join(', '));
+        console.log(missing.map(d => `'${d.path.join('.')}'`).join(', '));
       }
-      if (resultFileSummary.extra.length) {
-        if (resultFileSummary.missing.length) {
+      if (hasExtra > 0) {
+        if (hasMissing > 0) {
           console.log('But we also found some extra keys 🤔');
         } else {
           console.log(`We didn't find any missing keys but we did find some extra keys 🤔`);
         }
-        console.log(resultFileSummary.extra.map(d => `'${d.path.join('.')}'`).join(', '));
+        console.log(
+          extra.map(d => (d.path ? `'${d.path.join('.')}'` : Object.keys(d.rhs).map(v => `'${v}'`))).join(', ')
+        );
       }
     }
   } else {
-    ora().succeed(`${messages.noMissing} 🎉`);
+    console.log(`\n     🎉 ${messages.noMissing} 🎉\n`);
   }
 }
 
-function findMissingKeys({ argvMap, basePath }) {
-  const queries = [
-    {
-      type: 'directory',
-      name: 'src',
-      message: messages.src,
-      basePath,
-      when: () => !argvMap.src
-    },
-    {
-      type: 'directory',
-      name: 'i18n',
-      message: messages.translationsLocation,
-      basePath,
-      when: () => !argvMap.i18n
-    },
-    {
-      type: 'confirm',
-      default: false,
-      name: 'hasScope',
-      message: messages.hasScope,
-      when: () => !(argvMap.config || argvMap.noScope)
-    },
-    {
-      type: 'file-tree-selection',
-      name: 'config',
-      messages: messages.config,
-      when: ({ hasScope }) => !argvMap.noScope && (!argvMap.config || hasScope)
-    }
-  ];
-
+function findMissingKeys({ config, basePath }) {
   inquirer
-    .prompt(queries)
+    .prompt(config.interactive ? queries(basePath) : [])
     .then(input => {
-      const src = input.src || argvMap.src || 'src';
-      const scopes = getScopesMap(input.config || argvMap.config);
-      const i18nPath = input.i18n || argvMap.i18n || 'assets/i18n';
+      const src = input.src || config.src || defaultConfig.src;
+      const scopes = getScopesMap(input.configPath || config.configPath);
+      const i18nPath = input.i18n || config.i18n || defaultConfig.i18n;
+      const addMissing = input.addMissing || config.addMissing || defaultConfig.addMissing;
+      const defaultValue = input.defaultValue || config.defaultValue || defaultConfig.defaultValue;
       if (!fs.existsSync(i18nPath)) {
         return console.log(chalk.bgRed.black(messages.pathDoesntExists));
       }
       console.log('\n 🕵 🔎', `\x1b[4m${messages.startSearch}\x1b[0m`, '🔍 🕵\n');
       spinner = ora().start(`${messages.extract} `);
-      const options = { src, scopes };
+      const options = { src, scopes, defaultValue };
       buildKeys(options).then(({ keys }) => {
         spinner.succeed(`${messages.extract} 🗝`);
-        compareKeysToFiles({ keys, i18nPath: `${process.cwd()}/${i18nPath}` });
+        compareKeysToFiles({ keys, i18nPath: `${process.cwd()}/${i18nPath}`, addMissing });
       });
     })
     .catch(e => console.log(e));

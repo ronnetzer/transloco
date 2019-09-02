@@ -12,14 +12,63 @@ const [localLang] = require('os-locale')
 const messages = require('./messages').getMessages(localLang);
 const { mergeDeep, buildObjFromPath, isObject, toCamelCase, countKeysRecursively } = require('./helpers');
 const { regexs } = require('./regexs');
-
 let spinner;
-/** Template type ENUM */
+
+/** ENUMS */
 const TEMPLATE_TYPE = { STRUCTURAL: 0, NG_TEMPLATE: 1 };
 
 inquirer.registerPrompt('directory', promptDirectory);
 inquirer.registerPrompt('file-tree-selection', inquirerFileTreeSelection);
 
+const queries = basePath => [
+  {
+    type: 'directory',
+    name: 'src',
+    message: messages.src,
+    basePath
+  },
+  {
+    type: 'directory',
+    name: 'output',
+    message: messages.output,
+    basePath
+  },
+  {
+    type: 'confirm',
+    default: false,
+    name: 'hasScope',
+    message: messages.hasScope
+  },
+  {
+    type: 'file-tree-selection',
+    name: 'configPath',
+    messages: messages.config,
+    when: ({ hasScope }) => hasScope
+  },
+  {
+    type: 'input',
+    default: `en${localLang !== 'en' ? ', ' + localLang : ''}`,
+    name: 'langs',
+    message: messages.langs
+  },
+  {
+    type: 'input',
+    name: 'keepFlat',
+    message: messages.keepFlat
+  },
+  {
+    type: 'input',
+    name: 'defaultValue',
+    default: '""',
+    message: messages.defaultValue
+  }
+];
+const defaultConfig = {
+  src: 'src',
+  output: 'assets/i18n',
+  langs: 'en',
+  defaultValue: ''
+};
 /** Get the keys from an ngTemplate based html code. */
 function getTemplateBasedKeys(rgxResult, templateType) {
   let scopeKeys, read, readSearch, varName;
@@ -48,7 +97,7 @@ function initExtraction(src) {
 /**
  * Extract all the keys that exists in the ts files. (no dynamic)
  */
-function extractTSKeys({ src, keepFlat = [], scopes }) {
+function extractTSKeys({ src, keepFlat = [], scopes, defaultValue }) {
   let { srcPath, keys, fileCount } = initExtraction(src);
   return new Promise(resolve => {
     find
@@ -61,7 +110,7 @@ function extractTSKeys({ src, keepFlat = [], scopes }) {
         if (service) {
           /** service translationCalls regex */
           const rgx = regexs.translationCalls(service.groups.serviceName);
-          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes });
+          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
         }
       })
       .end(() => {
@@ -75,8 +124,8 @@ function extractTSKeys({ src, keepFlat = [], scopes }) {
  * 1. If this is a scoped key, enter to the correct scope.
  * 2. If this is a global key, enter to the reserved '__global' key in the map.
  */
-function insertValueToKeys({ inner, keys, scopes, key }) {
-  const value = inner.length ? buildObjFromPath(inner) : '';
+function insertValueToKeys({ inner, keys, scopes, key, defaultValue }) {
+  const value = inner.length ? buildObjFromPath(inner, defaultValue) : defaultValue;
   const scope = scopes.keysMap[key];
   if (scope) {
     if (!keys[scope]) {
@@ -91,7 +140,7 @@ function insertValueToKeys({ inner, keys, scopes, key }) {
 /**
  * Extract all the keys that exists in the template files.
  */
-function extractTemplateKeys({ src, keepFlat = [], scopes }) {
+function extractTemplateKeys({ src, keepFlat = [], scopes, defaultValue }) {
   let { srcPath, keys, fileCount } = initExtraction(src);
   return new Promise(resolve => {
     find
@@ -118,14 +167,14 @@ function extractTemplateKeys({ src, keepFlat = [], scopes }) {
                   inner.unshift(key);
                   key = read;
                 }
-                insertValueToKeys({ inner, scopes, keys, key });
+                insertValueToKeys({ inner, scopes, keys, key, defaultValue });
               });
             result = rgx.exec(str);
           }
         });
         /** directive & pipe */
         [regexs.directive, regexs.pipe, regexs.bindingPipe].forEach(rgx => {
-          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes });
+          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
         });
       })
       .end(() => {
@@ -137,14 +186,14 @@ function extractTemplateKeys({ src, keepFlat = [], scopes }) {
 /**
  * Iterates over a given regex until there a no results and adds all the keys found to the map.
  */
-function iterateRegex({ rgx, keys, str, keepFlat, scopes }) {
+function iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue }) {
   let result = rgx.exec(str);
   while (result) {
     const [key, ...inner] = result.groups.key.split('.');
     if (keepFlat.includes(key)) {
-      keys[result.groups.key] = '';
+      keys[result.groups.key] = defaultValue;
     } else {
-      insertValueToKeys({ inner, scopes, keys, key });
+      insertValueToKeys({ inner, scopes, keys, key, defaultValue });
     }
     result = rgx.exec(str);
   }
@@ -248,65 +297,29 @@ function getScopesMap(configPath) {
   return { keysMap };
 }
 
-/** The main function, collects the settings and starts the files build. */
-function buildTranslationFiles({ argvMap, basePath }) {
-  const queries = [
-    {
-      type: 'directory',
-      name: 'src',
-      message: messages.src,
-      basePath,
-      when: () => !argvMap.src
-    },
-    {
-      type: 'directory',
-      name: 'output',
-      message: messages.output,
-      basePath,
-      when: () => !argvMap.output
-    },
-    {
-      type: 'confirm',
-      default: false,
-      name: 'hasScope',
-      message: messages.hasScope,
-      when: () => !(argvMap.config || argvMap.noScope)
-    },
-    {
-      type: 'file-tree-selection',
-      name: 'config',
-      messages: messages.config,
-      when: ({ hasScope }) => !argvMap.noScope && (!argvMap.config || hasScope)
-    },
-    {
-      type: 'input',
-      default: `en${localLang !== 'en' ? ', ' + localLang : ''}`,
-      name: 'langs',
-      message: messages.langs,
-      when: () => !argvMap.langs
-    },
-    {
-      type: 'input',
-      name: 'keepFlat',
-      message: messages.keepFlat,
-      when: () => !argvMap.noFlat && !argvMap.keepFlat
-    }
-  ];
-  inquirer
-    .prompt(queries)
-    .then(input => {
-      /** Merge cli input, argv and defaults */
-      const src = input.src || argvMap.src || 'src';
-      const langs = input.langs || argvMap.langs;
-      let output = input.output || argvMap.output || 'assets/i18n';
-      output = output.endsWith('/') ? output.slice(0, -1) : output;
-      const scopes = getScopesMap(input.config || argvMap.config);
-      let keepFlat = input.keepFlat || argvMap.keepFlat;
-      keepFlat = keepFlat ? keepFlat.split(',').map(l => l.trim()) : [];
+/** Merge cli input, argv and defaults */
+function initProcessParams(input, config) {
+  const src = input.src || config.src || defaultConfig.src;
+  const langs = input.langs || config.langs || defaultConfig.langs;
+  const defaultValue = input.defaultValue || config.defaultValue || defaultConfig.defaultValue;
+  let output = input.output || config.output || defaultConfig.output;
+  output = output.endsWith('/') ? output.slice(0, -1) : output;
+  const scopes = getScopesMap(input.configPath || config.configPath);
+  let keepFlat = input.keepFlat || config.keepFlat;
+  keepFlat = keepFlat ? keepFlat.split(',').map(l => l.trim()) : [];
 
+  return { src, langs, defaultValue, output, scopes, keepFlat };
+}
+
+/** The main function, collects the settings and starts the files build. */
+function buildTranslationFiles({ config, basePath }) {
+  inquirer
+    .prompt(config.interactive ? queries(basePath) : [])
+    .then(input => {
+      const { src, langs, defaultValue, output, scopes, keepFlat } = initProcessParams(input, config);
       console.log('\x1b[4m%s\x1b[0m', `\n${messages.startBuild(langs.length)} 👷🏗\n`);
       spinner = ora().start(`${messages.extract} 🗝`);
-      const options = { src, keepFlat, scopes };
+      const options = { src, keepFlat, scopes, defaultValue };
       buildKeys(options).then(({ keys, fileCount }) => {
         spinner.succeed(`${messages.extract} 🗝`);
         /** Count all the keys found and reduce the scopes & global keys */

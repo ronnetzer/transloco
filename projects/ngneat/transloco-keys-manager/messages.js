@@ -17,6 +17,8 @@ const messages = {
     pathDoesntExists: `The path provided for the translation files doesn't exists! Exiting script...`,
     summary: 'Summary',
     noMissing: 'No missing keys were found',
+    defaultValue: 'Enter default key value',
+    addMissing: 'Add missing keys automatically?',
     done: 'Done!'
   },
   ru: {

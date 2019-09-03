@@ -1,7 +1,7 @@
 {
-  "name": "@ngneat/transloco-persist-lang",
+  "name": "@ngneat/transloco-preload-langs",
   "version": "1.0.1",
-  "description": "Transloco persist active language",
+  "description": "Preload languages for Angular Transloco",
   "publishConfig": {
     "access": "public"
   },
@@ -23,6 +23,6 @@
   "peerDependencies": {
     "@angular/common": "^7.2.0",
     "@angular/core": "^7.2.0",
-    "@ngneat/transloco": "^1.4.0"
+    "@ngneat/transloco": "^1.6.0"
   }
 }

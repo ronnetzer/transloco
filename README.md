@@ -32,6 +32,7 @@ The internationalization (i18n) library for Angular
 - [Transloco Config](#config-options)
 - [Translation in the Template](#translation-in-the-template)
   - [Using the Structural Directive](#using-the-structural-directive)
+      - [Using the read input](#using-the-read-input)
   - [Using the Attribute Directive](#using-the-attribute-directive)
   - [Using the Pipe](#using-the-pipe)
 - [Programmatical Translation](#programmatical-translation)
@@ -43,8 +44,9 @@ The internationalization (i18n) library for Angular
   - [Transloco Loader](#transloco-loader)
   - [Transloco Interceptor](#transloco-interceptor)
   - [Transloco Transpiler](#transloco-transpiler)
+  - [Transloco Missing Handler](#transloco-missing-handler)
+  - [Transloco Fallback Strategy](#transloco-fallback-strategy)
 - [Prefetch the User Language](#prefetch-the-user-language)
-- [MessageFormat Support](#messageformat-support)
 - [Unit Testing](#unit-testing)
 - [Additional Functionality](#additional-functionality)
 - [Plugins](#plugins)
@@ -90,7 +92,7 @@ import { environment } from '../environments/environment';
 @NgModule({
   imports: [TranslocoModule, HttpClientModule],
   providers: [
-    httpLoader
+    httpLoader,
     {
       provide: TRANSLOCO_CONFIG,
       useValue: {
@@ -157,9 +159,11 @@ This is the recommended approach. It's DRY and efficient, as it creates one subs
 </ng-template>
 ```
 
-If you are using `shared` strategy (default in the next major release), you can use `read` property in your structural directive to get translations of a particular nested (including deeply nested) property.
 
-Given this translation object:
+#### Using the read input
+You can use the `read` input in your structural directive to get translations of a particular nested (including deeply nested) property.
+
+Let's say you need to use the `dashboard` scope all over the template. Given this translation object:
 
 ```typescript
 {
@@ -174,7 +178,7 @@ Given this translation object:
 }
 ```
 
-you can do
+you can do:
 
 ```html
 <ng-container *transloco="let t; read: 'dashboard'">
@@ -229,6 +233,13 @@ Note that in order to safely use this method, you are responsible for ensuring t
 ```ts
 this.service.selectTranslate('hello').subscribe(value => ...);
 this.service.selectTranslate('hello', params, lang).subscribe(value => ...);
+
+// When quering an object that should be transpiled
+// For example: { a: { b: 'Hello {{ value }}', c: 'Hey {{ dynamic }}' }}
+this.service.selectTranslate('a', {
+  'b': { value: '' },
+  'c': { dynamic: '' }
+}).subscribe(obj => ...);
 
 // Returns the active language translation
 this.service.selectTranslation().subscribe(translation => ...);
@@ -425,6 +436,8 @@ Alternatively, here is how to use it directly in the template:
 </ng-container>
 ```
 
+Note that it will be used as the **initial language**. If you need it to be **static**, you can use the `static` pipe: `en|static`.
+
 ## Custom Loading Template
 
 Transloco provides you with a way to define a loading template, that will be used while the translation file is loading.
@@ -513,7 +526,7 @@ The transpiler is responsible for resolving the given value. For example, the de
 
 ```ts
 export class CustomTranspiler implements TranslocoTranspiler {
-  transpile(value: string, params, translation: Translation): string {
+  transpile(value: any, params, translation: Translation): any {
     return ...;
   }
 }
@@ -523,6 +536,25 @@ export const custom = {
   useClass: CustomTranspiler
 }
 ```
+
+#### Transloco Missing Handler
+
+This handler is responsible for handling missing keys. The default handler calls `console.warn()` with the key when `config.isProdMode` is set to `false`, and returns an empty string to use as a replacement for the missing key's value.
+
+```ts
+export class CustomHandler implements TranslocoMissingHandler {
+  handle(key: string, params: HashMap, config: TranslocoConfig) {
+    return '...';
+  }
+}
+
+export const custom = {
+  provide: TRANSLOCO_MISSING_HANDLER,
+  useClass: CustomHandler
+};
+```
+
+**Note:** The missing handler is [**not supported when using structural directive.**](https://github.com/ngneat/transloco/issues/52#issuecomment-526313689)
 
 #### Transloco Fallback Strategy
 
@@ -579,40 +611,6 @@ This will make sure the application doesn't bootstrap before Transloco loads the
 
 You can read more about it in [this article](https://netbasal.com/optimize-user-experience-while-your-angular-app-loads-7e982a67ff1a).
 
-## MessageFormat Support
-
-The library comes with support for [messageformat](https://messageformat.github.io/messageformat/).
-Messageformat is a mechanism for handling both pluralization and gender in your app.
-
-You can see its format guide [here](https://messageformat.github.io/messageformat/page-guide).
-
-Then add the following to the providers array in your `app.module.ts`:
-
-```ts
-import { MessageFormatTranspiler } from '@ngneat/transloco';
-
-...
-
-@NgModule({
-  providers: [
-    ...,
-    { provide: TRANSLOCO_TRANSPILER, useClass: MessageFormatTranspiler }
-  ]
-})
-
-```
-
-The `MessageFormatTranspiler` is compatible with the `DefaultTranspiler` and therefore you can switch without worry that it will break your current translations.
-
-It then enables support for the following within your i18n translation files:
-
-```js
-{
-  "mySelectRule": "{myVar, select, val1 {Value 1} val2 {Value 2} other {Other Value}}",
-  "myPluralRule": "{myCount, plural, =0 {no results} one {1 result} other {# results}}"
-}
-```
-
 ## Unit Testing
 
 When running specs, we want the have the languages available immediately, in a synchronous fashion. Transloco provides you with a `TranslocoTestingModule`, where you can pass the languages you need in your specs. For example:
@@ -668,7 +666,7 @@ translate('someKey');
 - `getBrowserCultureLang()` - Returns the culture language code name from the browser, e.g. "en-US"
 
 ```ts
-import { getBrowserLang, getBrowserCultureLang } from 'ngneat/transloco';
+import { getBrowserLang, getBrowserCultureLang } from '@ngneat/transloco';
 ```
 
 ## Migration from ngx-translate
@@ -679,30 +677,31 @@ Transloco provides a schematics [command](https://github.com/ngneat/transloco/bl
 
 | Feature                  | @ngneat/transloco                        | @ngx-translate/core                                             | Angular i18n |
 | ------------------------ | ---------------------------------------- | --------------------------------------------------------------- | ------------ |
-| Actively Maintained      | ✅                                       | ❌ [See here](https://github.com/ngx-translate/core/issues/783) | ✅           |
-| Runtime Lang Change      | ✅                                       | ✅                                                              | ❌           |
-| listenToLangChange       | ✅                                       | ❌                                                              | ❌           |
-| Schematics               | ✅                                       | ❌                                                              | ❌           |
-| Custom Loading Template  | ✅                                       | ❌                                                              | ❌           |
-| Multiple Languages       | ✅                                       | ✅\*                                                            | ❌           |
-| Lazy Load Translations   | ✅                                       | ✅\*                                                            | ✅           |
-| Multiple Fallbacks       | ✅                                       | ❌                                                              | ❌           |
-| Hackable                 | ✅                                       | ✅                                                              | ❌           |
-| Testing                  | ✅                                       | ✅ External library                                             | ❌           |
-| Structural Directive     | ✅                                       | ❌                                                              | ❌           |
-| Attribute Directive      | ✅                                       | ✅                                                              | ✅           |
-| Pipe                     | ✅                                       | ✅                                                              | ❌           |
-| Ivy support              | ✅                                       | ❌ [See here](https://github.com/ngx-translate/core/issues/958) | ✅           |
-| Additional Functionality | ✅ [See here](#additional-functionality) | ❌                                                              | ❌           |
-| Pluralization            | ✅                                       | ✅ External library                                             | ✅           |
-| Plugins                  | WIP                                      | ✅ [See here](https://github.com/ngx-translate/core#plugins)    | ❌           |
+| Actively Maintained      | ✅                                                                                                            | ❌ [See here](https://github.com/ngx-translate/core/issues/783) | ✅           |
+| Runtime Lang Change      | ✅                                                                                                            | ✅                                                              | ❌           |
+| listenToLangChange       | ✅                                                                                                            | ❌                                                              | ❌           |
+| Schematics               | ✅                                                                                                            | ❌                                                              | ❌           |
+| Custom Loading Template  | ✅                                                                                                            | ❌                                                              | ❌           |
+| Multiple Languages       | ✅                                                                                                            | ✅\*                                                            | ❌           |
+| Lazy Load Translations   | ✅                                                                                                            | ✅\*                                                            | ✅           |
+| Multiple Fallbacks       | ✅                                                                                                            | ❌                                                              | ❌           |
+| Hackable                 | ✅                                                                                                            | ✅                                                              | ❌           |
+| Testing                  | ✅                                                                                                            | ✅ External library                                             | ❌           |
+| Structural Directive     | ✅                                                                                                            | ❌                                                              | ❌           |
+| Attribute Directive      | ✅                                                                                                            | ✅                                                              | ✅           |
+| Pipe                     | ✅                                                                                                            | ✅                                                              | ❌           |
+| Ivy support              | ✅                                                                                                            | ❌ [See here](https://github.com/ngx-translate/core/issues/958) | ✅           |
+| Additional Functionality | ✅ [See here](#additional-functionality)                                                                      | ❌                                                              | ❌           |
+| Pluralization            | ✅ [Official Plugin](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-messageformat) | ✅ External library                                             | ✅           |
 
 (\*) Works **only** by creating a new service instance and mark it as isolated, and it's not supported at the directive level.
 
 ## Plugins
 
-- [Persist Language](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-persist-lang) (offical)
-- [Persist Translations](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-persist-translations) (offical)
+- [Messageformat](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-messageformat) (official)
+- [Persist Language](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-persist-lang) (official)
+- [Persist Translations](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-persist-translations) (official)
+- [Preload Languages](https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-preload-langs) (official)
 
 ## Support
 
@@ -727,15 +726,10 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- markdownlint-disable -->
 <table>
   <tr>
-    <td align="center"><a href="https://www.netbasal.com"><img src="https://avatars1.githubusercontent.com/u/6745730?v=4" width="100px;" alt="Netanel Basal"/><br /><sub><b>Netanel Basal</b></sub></a><br /><a href="#blog-NetanelBasal" title="Blogposts">📝</a> <a href="#business-NetanelBasal" title="Business development">💼</a> <a href="https://github.com/ngneat/transloco/commits?author=NetanelBasal" title="Code">💻</a> <a href="#content-NetanelBasal" title="Content">🖋</a> <a href="#design-NetanelBasal" title="Design">🎨</a> <a href="https://github.com/ngneat/transloco/commits?author=NetanelBasal" title="Documentation">📖</a> <a href="#example-NetanelBasal" title="Examples">💡</a> <a href="#ideas-NetanelBasal" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-NetanelBasal" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-NetanelBasal" title="Maintenance">🚧</a> <a href="#projectManagement-NetanelBasal" title="Project Management">📆</a> <a href="https://github.com/ngneat/transloco/commits?author=NetanelBasal" title="Tests">⚠️</a></td>
-    <td align="center"><a href="https://github.com/shaharkazaz"><img src="https://avatars2.githubusercontent.com/u/17194830?v=4" width="100px;" alt="Shahar Kazaz"/><br /><sub><b>Shahar Kazaz</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=shaharkazaz" title="Code">💻</a> <a href="#content-shaharkazaz" title="Content">🖋</a> <a href="https://github.com/ngneat/transloco/commits?author=shaharkazaz" title="Documentation">📖</a> <a href="#ideas-shaharkazaz" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-shaharkazaz" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-shaharkazaz" title="Maintenance">🚧</a> <a href="https://github.com/ngneat/transloco/commits?author=shaharkazaz" title="Tests">⚠️</a></td>
-    <td align="center"><a href="https://github.com/itayod"><img src="https://avatars2.githubusercontent.com/u/6719615?v=4" width="100px;" alt="Itay Oded"/><br /><sub><b>Itay Oded</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=itayod" title="Code">💻</a> <a href="#ideas-itayod" title="Ideas, Planning, & Feedback">🤔</a> <a href="#infra-itayod" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-itayod" title="Maintenance">🚧</a> <a href="https://github.com/ngneat/transloco/commits?author=itayod" title="Tests">⚠️</a></td>
     <td align="center"><a href="https://twitter.com/irustm"><img src="https://avatars1.githubusercontent.com/u/16316579?v=4" width="100px;" alt="Rustam"/><br /><sub><b>Rustam</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=irustm" title="Documentation">📖</a></td>
     <td align="center"><a href="https://github.com/Coly010"><img src="https://avatars2.githubusercontent.com/u/12140467?v=4" width="100px;" alt="Colum Ferry"/><br /><sub><b>Colum Ferry</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=Coly010" title="Code">💻</a> <a href="https://github.com/ngneat/transloco/commits?author=Coly010" title="Documentation">📖</a> <a href="#ideas-Coly010" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/ngneat/transloco/commits?author=Coly010" title="Tests">⚠️</a> <a href="#blog-Coly010" title="Blogposts">📝</a></td>
     <td align="center"><a href="https://www.armanozak.com/"><img src="https://avatars3.githubusercontent.com/u/15855540?v=4" width="100px;" alt="Levent Arman Özak"/><br /><sub><b>Levent Arman Özak</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=armanozak" title="Code">💻</a></td>
     <td align="center"><a href="https://github.com/theblushingcrow"><img src="https://avatars3.githubusercontent.com/u/638818?v=4" width="100px;" alt="Inbal Sinai"/><br /><sub><b>Inbal Sinai</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=theblushingcrow" title="Documentation">📖</a></td>
-  </tr>
-  <tr>
     <td align="center"><a href="http://www.larskniep.nl"><img src="https://avatars1.githubusercontent.com/u/1215195?v=4" width="100px;" alt="Lars Kniep"/><br /><sub><b>Lars Kniep</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=larscom" title="Code">💻</a> <a href="#ideas-larscom" title="Ideas, Planning, & Feedback">🤔</a></td>
     <td align="center"><a href="https://github.com/fxck"><img src="https://avatars1.githubusercontent.com/u/1303561?v=4" width="100px;" alt="Aleš"/><br /><sub><b>Aleš</b></sub></a><br /><a href="https://github.com/ngneat/transloco/commits?author=fxck" title="Code">💻</a> <a href="#ideas-fxck" title="Ideas, Planning, & Feedback">🤔</a></td>
   </tr>

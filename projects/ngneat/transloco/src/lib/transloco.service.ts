@@ -1,6 +1,6 @@
 import { Inject, Injectable, Optional } from '@angular/core';
-import { BehaviorSubject, combineLatest, from, Observable, Subject } from 'rxjs';
-import { catchError, distinctUntilChanged, map, retry, shareReplay, tap } from 'rxjs/operators';
+import { BehaviorSubject, combineLatest, from, Observable, Subject, of } from 'rxjs';
+import { catchError, distinctUntilChanged, map, retry, shareReplay, tap, switchMap } from 'rxjs/operators';
 import { DefaultLoader, TRANSLOCO_LOADER, TranslocoLoader } from './transloco.loader';
 import { TRANSLOCO_TRANSPILER, TranslocoTranspiler } from './transloco.transpiler';
 import { HashMap, TranslateParams, Translation, TranslocoEvents } from './types';
@@ -13,7 +13,8 @@ import {
   mergeDeep,
   setValue,
   size,
-  toCamelCase
+  toCamelCase,
+  getPipeValue
 } from './helpers';
 import { defaultConfig, TRANSLOCO_CONFIG, TranslocoConfig } from './transloco.config';
 import { TRANSLOCO_MISSING_HANDLER, TranslocoMissingHandler } from './transloco-missing-handler';
@@ -126,15 +127,17 @@ export class TranslocoService {
    * translate('hello', { }, 'en')
    */
   translate<T = any>(key: TranslateParams, params: HashMap = {}, lang?: string): T {
+    const withScope = this.completeScopeWithLang(lang);
+
     if (Array.isArray(key)) {
-      return key.map(k => this.translate(k, params, lang)) as any;
+      return key.map(k => this.translate(k, params, withScope)) as any;
     }
 
     if (!key) {
       return this.missingHandler.handle(key as string, params, this.config);
     }
 
-    const translation = this.translations.get(lang || this.getActiveLang());
+    const translation = this.translations.get(withScope || this.getActiveLang());
     if (!translation) {
       return '' as any;
     }
@@ -160,8 +163,15 @@ export class TranslocoService {
    * selectTranslate<string>('hello').subscribe(value => ...)
    * selectTranslate<string>('hello', {}, 'es').subscribe(value => ...)
    */
-  selectTranslate<T = any>(key: TranslateParams, params?: HashMap, lang?: string): Observable<T> {
-    return this.load(lang || this.getActiveLang()).pipe(map(() => this.translate(key, params, lang)));
+  selectTranslate<T = any>(key: TranslateParams, params?: HashMap<any>, lang?: string): Observable<T> {
+    const withScopeOrLang = this.completeScopeWithLang(lang);
+    const load = lang => this.load(lang).pipe(map(() => this.translate(key, params, lang)));
+    if (withScopeOrLang) {
+      return load(withScopeOrLang);
+    } else {
+      // if the user doesn't pass lang, we need to listen to lang changes and update the value accordingly
+      return this.langChanges$.pipe(switchMap(lang => load(lang)));
+    }
   }
 
   /**
@@ -257,6 +267,15 @@ export class TranslocoService {
     }
 
     return this.load(langName);
+  }
+
+  private completeScopeWithLang(lang: string) {
+    const [isScoped, value] = getPipeValue(lang, 'scoped');
+    if (isScoped) {
+      lang = `${value}/${this.getActiveLang()}`;
+    }
+
+    return lang;
   }
 
   private _setTranslation(lang: string, translation: Translation) {

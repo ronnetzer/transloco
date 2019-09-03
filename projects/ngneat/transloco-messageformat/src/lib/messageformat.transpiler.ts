@@ -1,21 +1,41 @@
-import { DefaultTranspiler, TranslocoTranspiler, Translation, HashMap } from '@ngneat/transloco';
+import { Injectable, Inject, Optional } from '@angular/core';
+import { DefaultTranspiler, HashMap, Translation, isObject, setValue, getValue } from '@ngneat/transloco';
+
 import * as MessageFormat from 'messageformat';
+import { MessageformatConfig, TRANSLOCO_MESSAGE_FORMAT_CONFIG } from './messageformat.config';
 
-export class MessageFormatTranspiler implements TranslocoTranspiler {
-  defaultTranspiler: DefaultTranspiler = new DefaultTranspiler();
-  //@ts-ignore
-  messageFormat: MessageFormat = new MessageFormat();
+@Injectable()
+export class MessageFormatTranspiler extends DefaultTranspiler {
+  private messageFormat: MessageFormat;
 
-  transpile(value: string, params: HashMap = {}, translation: Translation): string {
+  constructor(@Optional() @Inject(TRANSLOCO_MESSAGE_FORMAT_CONFIG) config: MessageformatConfig) {
+    super();
+    const { locales, ...messageConfig } = config || { locales: undefined };
+    //@ts-ignore
+    this.messageFormat = new MessageFormat(locales, messageConfig);
+  }
+
+  transpile(value: any, params: HashMap<any> = {}, translation: Translation): any {
     if (!value) {
       return value;
     }
 
-    // TODO: @shahar resolve object
+    if (isObject(value) && params) {
+      Object.keys(params).forEach(p => {
+        const v = getValue(value as Object, p);
+        const getParams = getValue(params, p);
 
-    const transpiled = this.defaultTranspiler.transpile(value, params, translation);
-    const message = this.messageFormat.compile(transpiled);
+        const transpiled = super.transpile(v, getParams, translation);
+        const message = this.messageFormat.compile(transpiled);
+        value = setValue(value, p, message(params[p]));
+      });
+    } else {
+      const transpiled = super.transpile(value, params, translation);
 
-    return message(params);
+      const message = this.messageFormat.compile(transpiled);
+      return message(params);
+    }
+
+    return value;
   }
 }

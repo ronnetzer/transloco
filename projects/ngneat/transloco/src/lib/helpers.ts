@@ -54,7 +54,7 @@ export function isString(val: any): val is string {
 }
 
 export function isObject(item): boolean {
-  return item && typeof item === 'object' && !Array.isArray(item);
+  return item && typeof item === 'object' && !Array.isArray(item) && item !== null;
 }
 
 export function coerceArray(val) {
@@ -118,4 +118,25 @@ export function toCamelCase(str: string): string {
 
 export function isBrowser() {
   return typeof window !== 'undefined';
+}
+
+/**
+ * @example
+ *
+ * getPipeValue('todos|scoped', 'scoped') [true, 'todos']
+ * getPipeValue('en|static', 'static') [true, 'en']
+ * getPipeValue('en', 'static') [false, 'en']
+ */
+export function getPipeValue(str: string, value: string, char = '|'): [boolean, string] {
+  if (isString(str)) {
+    const splitted = str.split(char);
+    const lastItem = splitted.pop();
+    return lastItem === value ? [true, splitted.toString()] : [false, lastItem];
+  }
+
+  return [false, ''];
+}
+
+export function isNil(value: any) {
+  return value === null || value === undefined;
 }

@@ -40,8 +40,6 @@ export class TranslocoPersistLangService {
 
   private updateStorageOnLangChange() {
     this.service.langChanges$.pipe(skip(1)).subscribe(lang => {
-      console.log(lang);
-
       this.save(lang);
     });
   }
@@ -70,7 +68,9 @@ export class TranslocoPersistLangService {
   }
 
   private save(lang: string) {
-    console.log(`%c 🍻 Saving ${lang} to storage`, 'background: #fff; color: #2196F3;');
+    if (this.service.config.prodMode === false) {
+      console.log(`%c 🍻 Saving ${lang} to storage`, 'background: #fff; color: #2196F3;');
+    }
     this.storage.setItem(this.storageKey, lang);
   }
 }

@@ -12,6 +12,8 @@ const glob = require('glob');
 const chalk = require('chalk');
 const { regexs } = require('./regexs');
 const { DeepDiff } = require('deep-diff');
+const { applyChange } = require('deep-diff');
+const Table = require('cli-table');
 let spinner;
 
 inquirer.registerPrompt('directory', promptDirectory);
@@ -58,10 +60,10 @@ const defaultConfig = {
   src: 'src',
   i18n: 'assets/i18n',
   addMissing: true,
-  defaultValue: '""'
+  defaultValue: ''
 };
 
-function compareKeysToFiles({ keys, i18nPath }) {
+function compareKeysToFiles({ keys, i18nPath, addMissing }) {
   spinner = ora().start(`${messages.checkMissing} ✨`);
   const result = {};
   /** An array of the existing translation files in the i18n dir */
@@ -71,7 +73,9 @@ function compareKeysToFiles({ keys, i18nPath }) {
     const { scope, fileLang } = regexs.fileLang(i18nPath).exec(fileName).groups;
     /** Read the current file */
     const file = readFile(fileName);
-    const diffArr = DeepDiff(scope ? keys[scope.slice(0, -1)] : keys.__global, JSON.parse(file));
+    const fileObj = JSON.parse(file);
+    const extracted = scope ? keys[scope.slice(0, -1)] : keys.__global;
+    const diffArr = DeepDiff(fileObj, extracted);
     if (diffArr) {
       const lang = `${scope || ''}${fileLang}`;
       result[lang] = {
@@ -80,58 +84,81 @@ function compareKeysToFiles({ keys, i18nPath }) {
       };
       for (const diff of diffArr) {
         switch (diff.kind) {
-          case 'D':
-            result[lang].missing.push(diff);
-            break;
           case 'N':
+            result[lang].missing.push(diff);
+            if (addMissing) {
+              applyChange(fileObj, extracted, diff);
+            }
+            break;
+          case 'D':
             result[lang].extra.push(diff);
             break;
         }
       }
+      if (addMissing) {
+        const json = JSON.stringify(fileObj, null, 2);
+        /** Write the corrected object to the original file */
+        fs.writeFileSync(fileName, json, 'utf8');
+      }
     }
   }
   spinner.succeed(`${messages.checkMissing} ✨`);
-  console.log('\n              🏁', `\x1b[4m${messages.summary}\x1b[0m`, '🏁');
   const resultFiles = Object.keys(result).filter(rf => {
     const { missing, extra } = result[rf];
     return missing.length || extra.length;
   });
   if (resultFiles.length > 0) {
+    console.log();
+    spinner.succeed(`🏁 \x1b[4m${messages.summary}\x1b[0m 🏁`);
+    const table = new Table({
+      head: ['File Name', 'Missing Keys', 'Extra Keys'].map(h => chalk.cyan(h)),
+      colWidths: [40, 40, 30]
+    });
     for (let i = 0; i < resultFiles.length; i++) {
+      const row = [];
       const { missing, extra } = result[resultFiles[i]];
       const hasMissing = missing.length > 0;
       const hasExtra = extra.length > 0;
       if (!(hasExtra || hasMissing)) continue;
-      console.log(`\x1b[4m${i + 1}. ${resultFiles[i]}.json\x1b[0m`);
+      row.push(`${resultFiles[i]}`);
       if (hasMissing) {
-        console.log('We found the following missing keys in this file:');
-        console.log(missing.map(d => `'${d.path.join('.')}'`).join(', '));
+        row.push(missing.map(d => `'${d.path.join('.')}'`).join(', '));
+      } else {
+        row.push('--');
       }
       if (hasExtra > 0) {
-        if (hasMissing > 0) {
-          console.log('But we also found some extra keys 🤔');
-        } else {
-          console.log(`We didn't find any missing keys but we did find some extra keys 🤔`);
-        }
-        console.log(
-          extra.map(d => (d.path ? `'${d.path.join('.')}'` : Object.keys(d.rhs).map(v => `'${v}'`))).join(', ')
-        );
+        row.push(extra.map(d => (d.path ? `'${d.path.join('.')}'` : Object.keys(d.lhs).map(v => `'${v}'`))).join(', '));
+      } else {
+        row.push('--');
       }
+      table.push(row);
     }
+    console.log(table.toString());
+    addMissing && spinner.succeed(`Added all missing keys to files 📜\n`);
   } else {
-    console.log(`\n     🎉 ${messages.noMissing} 🎉\n`);
+    console.log(`\n🎉 ${messages.noMissing} 🎉\n`);
   }
+}
+
+/** Merge cli input, argv and defaults */
+function initProcessParams(input, config) {
+  const src = input.src || config.src || defaultConfig.src;
+  const scopes = getScopesMap(input.configPath || config.configPath);
+  const i18nPath = input.i18n || config.i18n || defaultConfig.i18n;
+  let addMissing = input.addMissing;
+  if (addMissing === undefined) addMissing = config.addMissing;
+  if (addMissing === undefined) addMissing = defaultConfig.addMissing;
+
+  const defaultValue = input.defaultValue || config.defaultValue || defaultConfig.defaultValue;
+
+  return { src, i18nPath, defaultValue, addMissing, scopes };
 }
 
 function findMissingKeys({ config, basePath }) {
   inquirer
     .prompt(config.interactive ? queries(basePath) : [])
     .then(input => {
-      const src = input.src || config.src || defaultConfig.src;
-      const scopes = getScopesMap(input.configPath || config.configPath);
-      const i18nPath = input.i18n || config.i18n || defaultConfig.i18n;
-      const addMissing = input.addMissing || config.addMissing || defaultConfig.addMissing;
-      const defaultValue = input.defaultValue || config.defaultValue || defaultConfig.defaultValue;
+      const { src, i18nPath, defaultValue, addMissing, scopes } = initProcessParams(input, config);
       if (!fs.existsSync(i18nPath)) {
         return console.log(chalk.bgRed.black(messages.pathDoesntExists));
       }

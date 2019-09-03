@@ -12,9 +12,9 @@
 </ng-container>
 <span transloco="11"></span>
 <div transloco="12" [translocoParams]="{value: 'hello'}"></div>
-<div [transloco]="dontgrab5"></div>
-<span>{{ '13' | transloco}}</span>
-<span>{{ "14" | transloco }}</span>
+<div [transloco]="dontgrab6"></div>
+<span>{{ condition ? '13' : '999' | transloco}}</span>
+<span>{{ condition ? "14" : 'kazaz.kfc' | transloco }}</span>
 <span>{{ '15' | transloco: { value: 'dynamic'} }}</span>
 <span [hello]="'16' | transloco"></span>
 <span [hello]='"17" | transloco'></span>

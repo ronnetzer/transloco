@@ -112,6 +112,11 @@ function extractTSKeys({ src, keepFlat = [], scopes, defaultValue }) {
           const rgx = regexs.translationCalls(service.groups.serviceName);
           keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
         }
+        const directTranslate = regexs.directImport.exec(str);
+        if (directTranslate) {
+          const rgx = regexs.directTranslate;
+          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
+        }
       })
       .end(() => {
         resolve({ keys, fileCount });
@@ -173,7 +178,7 @@ function extractTemplateKeys({ src, keepFlat = [], scopes, defaultValue }) {
           }
         });
         /** directive & pipe */
-        [regexs.directive, regexs.pipe, regexs.bindingPipe].forEach(rgx => {
+        [regexs.directive, regexs.pipe].forEach(rgx => {
           keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
         });
       })
@@ -189,11 +194,15 @@ function extractTemplateKeys({ src, keepFlat = [], scopes, defaultValue }) {
 function iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue }) {
   let result = rgx.exec(str);
   while (result) {
-    const [key, ...inner] = result.groups.key.split('.');
-    if (keepFlat.includes(key)) {
-      keys[result.groups.key] = defaultValue;
-    } else {
-      insertValueToKeys({ inner, scopes, keys, key, defaultValue });
+    /** support ternary operator */
+    const regexKeys = result.groups.key.replace(/'|"|\s/g, '').split(':');
+    for (const regexKey of regexKeys) {
+      const [key, ...inner] = regexKey.split('.');
+      if (keepFlat.includes(key)) {
+        keys[result.groups.key] = defaultValue;
+      } else {
+        insertValueToKeys({ inner, scopes, keys, key, defaultValue });
+      }
     }
     result = rgx.exec(str);
   }
@@ -256,8 +265,8 @@ function createFiles({ keys, langs, outputPath }) {
   if (expectedFiles.length) {
     expectedFiles.forEach(fileName => {
       const { scope } = regexs.fileLang(outputPath).exec(fileName).groups;
-      const bla = scope ? scope.slice(0, -1) : '__global';
-      const json = JSON.stringify(keys[bla], null, 2);
+      const scopeKey = scope ? scope.slice(0, -1) : '__global';
+      const json = JSON.stringify(keys[scopeKey], null, 2);
       createJson(fileName, json);
     });
   }

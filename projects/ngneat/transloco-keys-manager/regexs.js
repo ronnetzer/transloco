@@ -5,8 +5,8 @@ const regexs = {
   templateKey: varName => new RegExp(`${varName}(?:(?:\\[(?:'|"))|\\.)([^}|]*)`, 'g'),
   template: /<ng-template[^>]*transloco[^>]*>[^]+?<\/ng-template>/g,
   directive: /\stransloco="(?<key>[^"]*)"/g,
-  pipe: /{{\s*('|")(?<key>[^}\r\n]*)\1\s*\|\s*(?:transloco)/g,
-  bindingPipe: /=(?:'|")(?:\s*('|")(?<key>[^}\r\n]*)\1\s*\|)\s*(?:transloco)/g,
+  /** just conditional pipe /{{[^}|'"]*('|")(?<key>[^|}]*)\|[^}]*transloco/g */
+  pipe: /(?:(?:{{[^}|'"]*)|(?:\[[^\]]*\]=(?:"|')[^'"]*))('|")(?<key>[^|}>]*)\|[^}>]*transloco/g,
   fileLang: outputPath =>
     new RegExp(`${sanitizeForRegex(outputPath)}\\/(?<scope>(?:[^\\.\\/]*\\/)*)(?<fileLang>[^./]*)\\.json`),
   serviceInjection: /[^]*(?=(?:private|protected|public)\s+(?<serviceName>[^,:()]+)\s*:\s*(?:TranslocoService\s*(?:,|\))))[^]*/g,
@@ -16,7 +16,10 @@ const regexs = {
         name
       )})(?:\\s*\\t*\\r*\\n*)*\\.(?:\\s*\\t*\\r*\\n*)*(?:translate|selectTranslate)\\([^'"]*('|")(?<key>[^"']*)\\1[^)]*\\)`,
       'g'
-    )
+    ),
+  /** use the translate function directly */
+  directImport: /import\s*{\s*[^]*translate[^}]*}\s*from\s*("|')@ngneat\/transloco\1/g,
+  directTranslate: /[^.]translate[\r\s\n\t]*\([\r\s\n\t]*('|")(?<key>[^,)]*)\1/g
 };
 
 module.exports = { regexs };

@@ -1,10 +1,11 @@
 const { sanitizeForRegex } = require('./helpers');
 
 const regexs = {
-  structural: /<([a-zA-Z-]*)[^*>]*\*transloco=('|")\s*let\s+(?<varName>\w*)[^]*\2[^>]*>[^]+?<\/\1\s*>/g,
-  templateKey: varName => new RegExp(`${varName}(?:(?:\\[(?:'|"))|\\.)([^}|]*)`, 'g'),
+  structural: /<([a-zA-Z-]*)[^*>]*\*transloco=('|")\s*let\s+(?<varName>\w*)[^>]*\2>[^]+?<\/\1\s*>/g,
+  templateKey: varName => new RegExp(`${varName}(?:(?:\\[(?:'|"))|\\.)([^}|:]*)`, 'g'),
   template: /<ng-template[^>]*transloco[^>]*>[^]+?<\/ng-template>/g,
-  directive: /\stransloco="(?<key>[^"]*)"/g,
+  directive: /\stransloco\s*=\s*("|')(?<key>[^]+?)\1/g,
+  directiveTernary: /\s\[transloco\]\s*=\s*("|')[^"'?]*\?(?<key>[^]+?)\1/g,
   /** just conditional pipe /{{[^}|'"]*('|")(?<key>[^|}]*)\|[^}]*transloco/g */
   pipe: /(?:(?:{{[^}|'"]*)|(?:\[[^\]]*\]=(?:"|')[^'"]*))('|")(?<key>[^|}>]*)\|[^}>]*transloco/g,
   fileLang: outputPath =>
@@ -18,7 +19,7 @@ const regexs = {
       'g'
     ),
   /** use the translate function directly */
-  directImport: /import\s*{\s*[^]*translate[^}]*}\s*from\s*("|')@ngneat\/transloco\1/g,
+  directImport: /import\s*{\s*[^}]*translate[^}]*}\s*from\s*("|')@ngneat\/transloco\1/g,
   directTranslate: /[^.]translate[\r\s\n\t]*\([\r\s\n\t]*('|")(?<key>[^,)]*)\1/g
 };
 

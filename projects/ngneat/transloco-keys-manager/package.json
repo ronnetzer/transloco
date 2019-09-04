@@ -25,7 +25,7 @@
     "extract": {
       "src": "src",
       "output": "assets/i18n",
-      "langs": "en, es, ja",
+      "langs": "en",
       "configPath": "src/app.module.ts"
     },
     "find": {

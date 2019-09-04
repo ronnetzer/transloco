@@ -178,7 +178,7 @@ function extractTemplateKeys({ src, keepFlat = [], scopes, defaultValue }) {
           }
         });
         /** directive & pipe */
-        [regexs.directive, regexs.pipe].forEach(rgx => {
+        [regexs.directive, regexs.directiveTernary, regexs.pipe].forEach(rgx => {
           keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
         });
       })

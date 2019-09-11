@@ -6,8 +6,7 @@ const regexs = {
   template: /<ng-template[^>]*transloco[^>]*>[^]+?<\/ng-template>/g,
   directive: /\stransloco\s*=\s*("|')(?<key>[^]+?)\1/g,
   directiveTernary: /\s\[transloco\]\s*=\s*("|')[^"'?]*\?(?<key>[^]+?)\1/g,
-  /** just conditional pipe /{{[^}|'"]*('|")(?<key>[^|}]*)\|[^}]*transloco/g */
-  pipe: /(?:(?:{{[^}|'"]*)|(?:\[[^\]]*\]=(?:"|')[^'"]*))('|")(?<key>[^|}>]*)\|[^}>]*transloco/g,
+  pipe: /(?:(?:{{(?![^^}|'"+]*\+)[^}|'"]*)|(?:\[[^\]]*\]=(?:"|')(?![^'"+]*\+)[^'"]*))('|")(?<key>[^|}>]*)\|[^}>]*transloco/g,
   fileLang: outputPath =>
     new RegExp(`${sanitizeForRegex(outputPath)}\\/(?<scope>(?:[^\\.\\/]*\\/)*)(?<fileLang>[^./]*)\\.json`),
   serviceInjection: /[^]*(?=(?:private|protected|public)\s+(?<serviceName>[^,:()]+)\s*:\s*(?:TranslocoService\s*(?:,|\))))[^]*/g,

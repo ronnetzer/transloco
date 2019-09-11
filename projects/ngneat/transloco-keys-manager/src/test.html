@@ -24,6 +24,7 @@
 <ng-container *transloco="let t; read: 'admin'">
   {{t.1}} // {admin: {1: ''}}
 </ng-container>
+<span [hello]='"49" | transloco | another'></span>
 <ng-container *transloco="let t read: 'admin'">
   {{t.2}} // {admin: {2: ''}} {{t.3.4}} // {admin: {23: {24: ''}}}
 </ng-container>
@@ -46,6 +47,9 @@
 </ng-container>
 <ng-template let-t transloco>
   {{ t.todos.1 }}
+</ng-template>
+<ng-template transloco let-test>
+  {{ test.todos.2 }}
 </ng-template>
 <ng-template let-t transloco>
   {{ t.mf.1 }}

@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [1.7.8](https://github.com/ngneat/transloco/compare/v1.7.7...v1.7.8) (2019-09-11)
+
+### Bug Fixes
+
+- 🐛 update migration script ([c7510f7](https://github.com/ngneat/transloco/commit/c7510f7))
+
+### [1.7.7](https://github.com/ngneat/transloco/compare/v1.7.6...v1.7.7) (2019-09-11)
+
+### Bug Fixes
+
+- **testing:** set prodmode to true by default ([5995b75](https://github.com/ngneat/transloco/commit/5995b75))
+
+### [1.7.6](https://github.com/ngneat/transloco/compare/v1.7.5...v1.7.6) (2019-09-09)
+
+### Bug Fixes
+
+- 🐛 allow pass config in testing module ([caeaa8c](https://github.com/ngneat/transloco/commit/caeaa8c))
+
+### [1.7.5](https://github.com/ngneat/transloco/compare/v1.7.4...v1.7.5) (2019-09-08)
+
+### Bug Fixes
+
+- **core:** lack of unsubscriptions ([#65](https://github.com/ngneat/transloco/issues/65)) ([67f5d3f](https://github.com/ngneat/transloco/commit/67f5d3f))
+- 🐛 pipe should support any type ([bf3f11c](https://github.com/ngneat/transloco/commit/bf3f11c)), closes [#70](https://github.com/ngneat/transloco/issues/70)
+
+### [1.7.4](https://github.com/ngneat/transloco/compare/v1.7.3...v1.7.4) (2019-09-07)
+
+### Bug Fixes
+
+- 🐛 scope mapping ([a3545a1](https://github.com/ngneat/transloco/commit/a3545a1)), closes [#69](https://github.com/ngneat/transloco/issues/69)
+
+### [1.7.3](https://github.com/ngneat/transloco/compare/v1.7.2...v1.7.3) (2019-09-06)
+
+### Bug Fixes
+
+- 🐛 transpiler protection ([9471f17](https://github.com/ngneat/transloco/commit/9471f17))
+
+### [1.7.2](https://github.com/ngneat/transloco/compare/v1.7.1...v1.7.2) (2019-09-05)
+
+### Bug Fixes
+
+- 🐛 update migration script ([b712bd7](https://github.com/ngneat/transloco/commit/b712bd7))
+
 ### [1.7.1](https://github.com/ngneat/transloco/compare/v1.7.0...v1.7.1) (2019-09-03)
 
 ### Bug Fixes

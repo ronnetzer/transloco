@@ -8,7 +8,6 @@ const [localLang] = require('os-locale')
   .sync()
   .split('-');
 const messages = require('./messages').getMessages(localLang);
-const ora = require('ora');
 const glob = require('glob');
 const chalk = require('chalk');
 const { regexs } = require('./regexs');

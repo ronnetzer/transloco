@@ -4,7 +4,6 @@ const promptDirectory = require('inquirer-directory');
 const inquirerFileTreeSelection = require('inquirer-file-tree-selection-prompt');
 const inquirer = require('inquirer');
 const find = require('find');
-const ora = require('ora');
 const glob = require('glob');
 const [localLang] = require('os-locale')
   .sync()
@@ -321,7 +320,7 @@ function getScopesMap(configPath) {
   if (!configPath) {
     return { keysMap: {} };
   }
-  const configFile = readFile(configPath);
+  const configFile = readFile(`${process.cwd()}/${configPath}`);
   const scopeMapping = /scopeMapping[\s\r\t\n]*:[\s\r\t\n]*(?<scopes>{[^}]*})/g.exec(configFile);
   let scopes = '{}';
   if (scopeMapping) {

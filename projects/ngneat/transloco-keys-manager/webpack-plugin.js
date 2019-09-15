@@ -26,7 +26,14 @@ class TranslocoPlugin {
         return;
       }
       const keysExtractions = { html: [], ts: [] };
-      for (const file of Object.keys(comp.watchFileSystem.watcher.mtimes)) {
+      const files = Object.keys(comp.watchFileSystem.watcher.mtimes);
+      if (managerConfig.extract.configPath) {
+        const configChanged = files.some(file => file.includes(managerConfig.extract.configPath));
+        if (configChanged) {
+          commonConfig = initProcessParams({}, managerConfig.extract);
+        }
+      }
+      for (const file of files) {
         let fileType;
         if (file.endsWith('.html')) {
           fileType = 'html';

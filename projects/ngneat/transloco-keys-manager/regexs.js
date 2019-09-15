@@ -14,7 +14,7 @@ const regexs = {
     new RegExp(
       `(?:(?:\\s*|this\\.)${sanitizeForRegex(
         name
-      )}(?:\\s*\\t*\\r*\\n*)*\\.(?:\\s*\\t*\\r*\\n*)*(?:translate|selectTranslate)\\([^'"]*('|")(?<key>[^"']*)\\1[^'")]*(?:{[^)]+?,?)?(?:[^"']*('|")(?<lang>[^"']*)\\3)?\\)`,
+      )}(?:\\s*\\t*\\r*\\n*)*\\.(?:\\s*\\t*\\r*\\n*)*(?:translate|selectTranslate)\\([^'"]*('|")(?<key>[^"']*)\\1[^'")]*(?:{[^)]+?,?)?(?:[^"']*('|")(?<scope>[^"']*)\\3)?\\)`,
       'g'
     ),
   /** use the translate function directly */

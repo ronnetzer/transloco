@@ -148,7 +148,6 @@ function extractTSKeys({ src, keepFlat = [], scopes, defaultValue, files }) {
 function insertValueToKeys({ inner, keys, scopes, key, defaultValue }) {
   const value = inner.length ? buildObjFromPath(inner, defaultValue) : defaultValue;
   const scope = scopes.keysMap[key];
-  console.log(key, scope, scopes.keysMap);
   if (scope) {
     if (!keys[scope]) {
       keys[scope] = {};

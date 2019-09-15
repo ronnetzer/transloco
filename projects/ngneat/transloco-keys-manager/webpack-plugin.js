@@ -1,14 +1,23 @@
-const { mergeDeep } = require('./transloco-keys-manager/helpers');
-const { initProcessParams, extractTemplateKeys, extractTSKeys } = require('./transloco-keys-manager/keysBuilder');
-const { compareKeysToFiles } = require('./transloco-keys-manager/keysDetective');
+const { mergeDeep } = require('./helpers');
+const { initProcessParams, extractTemplateKeys, extractTSKeys } = require('./keysBuilder');
+const { compareKeysToFiles } = require('./keysDetective');
 const pkgDir = require('pkg-dir');
 const fs = require('fs');
 
 let init = true;
-const packageConfig = fs.readFileSync(`${pkgDir.sync()}/package.json`, { encoding: 'UTF-8' });
-const config = JSON.parse(packageConfig)['transloco-keys-manager'];
-const commonConfig = initProcessParams({}, config.extract);
+let managerConfig;
+let commonConfig;
 class TranslocoPlugin {
+  constructor(config) {
+    if (config) {
+      managerConfig = config;
+    } else {
+      const packageConfig = fs.readFileSync(`${pkgDir.sync()}/package.json`, { encoding: 'UTF-8' });
+      managerConfig = JSON.parse(packageConfig)['transloco-keys-manager'];
+    }
+    commonConfig = initProcessParams({}, managerConfig.extract);
+  }
+
   apply(compiler) {
     compiler.hooks.watchRun.tapAsync('WatchRun', (comp, cb) => {
       if (init) {
@@ -35,7 +44,7 @@ class TranslocoPlugin {
           const keysFound = Object.keys(allKeys).some(key => Object.keys(allKeys[key]).length > 0);
           // hold a file map and deep compare?
           keysFound &&
-            compareKeysToFiles({ keys: allKeys, i18nPath: config.find.i18n, addMissing: true, prodMode: true });
+            compareKeysToFiles({ keys: allKeys, i18nPath: managerConfig.find.i18n, addMissing: true, prodMode: true });
           cb();
         });
       } else {
@@ -44,6 +53,4 @@ class TranslocoPlugin {
     });
   }
 }
-module.exports = {
-  plugins: [new TranslocoPlugin()]
-};
+module.exports = TranslocoPlugin;

@@ -56,11 +56,24 @@ function countKeysRecursively(obj) {
   );
 }
 
+const defaultLogger = {
+  log: (...msg) => console.log(...msg),
+  succeed: msg => spinner.succeed(msg),
+  startSpinner: msg => (spinner = ora().start(msg))
+};
+const noop = () => {};
+const prodModeLogger = { log: noop, startSpinner: noop, succeed: noop };
+
+function getLogger(prodMode) {
+  return prodMode ? prodModeLogger : defaultLogger;
+}
+
 module.exports = {
   mergeDeep,
   buildObjFromPath,
   isObject,
   sanitizeForRegex,
   toCamelCase,
-  countKeysRecursively
+  countKeysRecursively,
+  getLogger
 };

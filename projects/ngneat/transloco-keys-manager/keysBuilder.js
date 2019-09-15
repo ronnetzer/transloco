@@ -10,7 +10,7 @@ const [localLang] = require('os-locale')
   .sync()
   .split('-');
 const messages = require('./messages').getMessages(localLang);
-const { mergeDeep, buildObjFromPath, isObject, toCamelCase, countKeysRecursively } = require('./helpers');
+const { mergeDeep, buildObjFromPath, isObject, toCamelCase, countKeysRecursively, getLogger } = require('./helpers');
 const { regexs } = require('./regexs');
 let spinner;
 
@@ -69,6 +69,8 @@ const defaultConfig = {
   langs: 'en',
   defaultValue: ''
 };
+let logger;
+
 /** Get the keys from an ngTemplate based html code. */
 function getTemplateBasedKeys(rgxResult, templateType) {
   let scopeKeys, read, readSearch, varName;
@@ -94,33 +96,47 @@ function readFile(file) {
 function initExtraction(src) {
   return { srcPath: `${process.cwd()}/${src}`, keys: { __global: {} }, fileCount: 0 };
 }
+function performTSExtraction({ file, scopes, defaultValue, keepFlat, keys }) {
+  const str = readFile(file);
+  if (!str.includes('@ngneat/transloco')) return;
+  const service = regexs.serviceInjection.exec(str);
+  if (service) {
+    /** service translationCalls regex */
+    const rgx = regexs.translationCalls(service.groups.serviceName);
+    keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
+  }
+  const directTranslate = regexs.directImport.exec(str);
+  if (directTranslate) {
+    const rgx = regexs.directTranslate;
+    keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
+  }
+  return keys;
+}
+
 /**
  * Extract all the keys that exists in the ts files. (no dynamic)
  */
-function extractTSKeys({ src, keepFlat = [], scopes, defaultValue }) {
+function extractTSKeys({ src, keepFlat = [], scopes, defaultValue, files }) {
   let { srcPath, keys, fileCount } = initExtraction(src);
   return new Promise(resolve => {
-    find
-      .eachfile(/\.ts$/, srcPath, file => {
-        /** Filter out spec files */
-        if (file.endsWith('.spec.ts')) return;
+    if (files) {
+      for (const file of files) {
         fileCount++;
-        const str = readFile(file);
-        const service = regexs.serviceInjection.exec(str);
-        if (service) {
-          /** service translationCalls regex */
-          const rgx = regexs.translationCalls(service.groups.serviceName);
-          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
-        }
-        const directTranslate = regexs.directImport.exec(str);
-        if (directTranslate) {
-          const rgx = regexs.directTranslate;
-          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
-        }
-      })
-      .end(() => {
-        resolve({ keys, fileCount });
-      });
+        keys = performTSExtraction({ file, defaultValue, keepFlat, scopes, keys });
+      }
+      resolve({ keys, fileCount });
+    } else {
+      find
+        .eachfile(/\.ts$/, srcPath, file => {
+          /** Filter out spec files */
+          if (file.endsWith('.spec.ts')) return;
+          fileCount++;
+          keys = performTSExtraction({ file, defaultValue, keepFlat, scopes, keys });
+        })
+        .end(() => {
+          resolve({ keys, fileCount });
+        });
+    }
   });
 }
 
@@ -132,6 +148,7 @@ function extractTSKeys({ src, keepFlat = [], scopes, defaultValue }) {
 function insertValueToKeys({ inner, keys, scopes, key, defaultValue }) {
   const value = inner.length ? buildObjFromPath(inner, defaultValue) : defaultValue;
   const scope = scopes.keysMap[key];
+  console.log(key, scope, scopes.keysMap);
   if (scope) {
     if (!keys[scope]) {
       keys[scope] = {};
@@ -142,49 +159,64 @@ function insertValueToKeys({ inner, keys, scopes, key, defaultValue }) {
   }
 }
 
+function performTemplateExtraction({ file, scopes, defaultValue, keepFlat, keys }) {
+  const str = readFile(file);
+  if (!str.includes('transloco')) return;
+  let result;
+  /** structural directive and ng-template */
+  [regexs.structural, regexs.template].forEach((rgx, index) => {
+    result = rgx.exec(str);
+    while (result) {
+      const { scopeKeys, read, varName } = getTemplateBasedKeys(result, index);
+      scopeKeys &&
+        scopeKeys.forEach(rawKey => {
+          /** The raw key may contain square braces we need to align it to '.' */
+          let [key, ...inner] = rawKey
+            .trim()
+            .replace(/\[/g, '.')
+            .replace(/'|"|\]/g, '')
+            .replace(`${varName}.`, '')
+            .split('.');
+          /** Set the read as the first key */
+          if (read) {
+            inner.unshift(key);
+            key = read;
+          }
+          insertValueToKeys({ inner, scopes, keys, key, defaultValue });
+        });
+      result = rgx.exec(str);
+    }
+  });
+  /** directive & pipe */
+  [regexs.directive, regexs.directiveTernary, regexs.pipe].forEach(rgx => {
+    keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
+  });
+
+  return keys;
+}
+
 /**
  * Extract all the keys that exists in the template files.
  */
-function extractTemplateKeys({ src, keepFlat = [], scopes, defaultValue }) {
+function extractTemplateKeys({ src, keepFlat = [], scopes, defaultValue, files }) {
   let { srcPath, keys, fileCount } = initExtraction(src);
   return new Promise(resolve => {
-    find
-      .eachfile(/\.html$/, srcPath, file => {
+    if (files) {
+      for (const file of files) {
         fileCount++;
-        const str = readFile(file);
-        let result;
-        /** structural directive and ng-template */
-        [regexs.structural, regexs.template].forEach((rgx, index) => {
-          result = rgx.exec(str);
-          while (result) {
-            const { scopeKeys, read, varName } = getTemplateBasedKeys(result, index);
-            scopeKeys &&
-              scopeKeys.forEach(rawKey => {
-                /** The raw key may contain square braces we need to align it to '.' */
-                let [key, ...inner] = rawKey
-                  .trim()
-                  .replace(/\[/g, '.')
-                  .replace(/'|"|\]/g, '')
-                  .replace(`${varName}.`, '')
-                  .split('.');
-                /** Set the read as the first key */
-                if (read) {
-                  inner.unshift(key);
-                  key = read;
-                }
-                insertValueToKeys({ inner, scopes, keys, key, defaultValue });
-              });
-            result = rgx.exec(str);
-          }
+        keys = performTemplateExtraction({ file, defaultValue, keepFlat, scopes, keys });
+      }
+      resolve({ keys, fileCount });
+    } else {
+      find
+        .eachfile(/\.html$/, srcPath, file => {
+          fileCount++;
+          keys = performTemplateExtraction({ file, defaultValue, keepFlat, scopes, keys });
+        })
+        .end(() => {
+          resolve({ keys, fileCount });
         });
-        /** directive & pipe */
-        [regexs.directive, regexs.directiveTernary, regexs.pipe].forEach(rgx => {
-          keys = iterateRegex({ rgx, keys, str, keepFlat, scopes, defaultValue });
-        });
-      })
-      .end(() => {
-        resolve({ keys, fileCount });
-      });
+    }
   });
 }
 
@@ -233,7 +265,7 @@ function verifyOutputDir(outputPath, folders) {
 
 /** Create/Merge the translation files */
 function createFiles({ keys, langs, outputPath }) {
-  spinner = ora().start(`${messages.creatingFiles} 🗂`);
+  logger.startSpinner(`${messages.creatingFiles} 🗂`);
   const scopes = Object.keys(keys);
   const langArr = langs.split(',').map(l => l.trim());
   /** Build an array of the expected translation files (based on all the scopes and langs) */
@@ -270,11 +302,11 @@ function createFiles({ keys, langs, outputPath }) {
       createJson(fileName, json);
     });
   }
-  spinner.succeed();
+  logger.succeed();
   if (currentFiles.length) {
-    spinner.succeed(messages.merged(currentFiles));
+    logger.succeed(messages.merged(currentFiles));
   }
-  console.log(`\n              🌵 ${messages.done} 🌵`);
+  logger.log(`\n              🌵 ${messages.done} 🌵`);
 }
 
 /** Build the keys object */
@@ -322,22 +354,31 @@ function initProcessParams(input, config) {
 
 /** The main function, collects the settings and starts the files build. */
 function buildTranslationFiles({ config, basePath }) {
-  inquirer
+  logger = getLogger(config.prodMode);
+  return inquirer
     .prompt(config.interactive ? queries(basePath) : [])
     .then(input => {
       const { src, langs, defaultValue, output, scopes, keepFlat } = initProcessParams(input, config);
-      console.log('\x1b[4m%s\x1b[0m', `\n${messages.startBuild(langs.length)} 👷🏗\n`);
-      spinner = ora().start(`${messages.extract} 🗝`);
+      logger.log('\x1b[4m%s\x1b[0m', `\n${messages.startBuild(langs.length)} 👷🏗\n`);
+      logger.startSpinner(`${messages.extract} 🗝`);
       const options = { src, keepFlat, scopes, defaultValue };
-      buildKeys(options).then(({ keys, fileCount }) => {
-        spinner.succeed(`${messages.extract} 🗝`);
+      return buildKeys(options).then(({ keys, fileCount }) => {
+        logger.succeed(`${messages.extract} 🗝`);
         /** Count all the keys found and reduce the scopes & global keys */
         const keysFound = countKeysRecursively(keys) - Object.keys(keys).length;
-        console.log(`${messages.keysFound(keysFound, fileCount)}`);
+        logger.log(`${messages.keysFound(keysFound, fileCount)}`);
         createFiles({ keys, langs, outputPath: `${process.cwd()}/${output}` });
       });
     })
-    .catch(e => console.log(e));
+    .catch(e => logger.log(e));
 }
 
-module.exports = { buildTranslationFiles, buildKeys, getScopesMap, readFile };
+module.exports = {
+  buildTranslationFiles,
+  buildKeys,
+  getScopesMap,
+  readFile,
+  initProcessParams,
+  extractTemplateKeys,
+  extractTSKeys
+};

@@ -1,5 +1,5 @@
 import { Rule, Tree, SchematicContext, SchematicsException, EmptyTree } from '@angular-devkit/schematics';
-import {TranslationFileFormat} from '../types';
+import { TranslationFileFormat } from '../types';
 import {
   getTranslationsRoot,
   getTranslationFiles,
@@ -9,8 +9,10 @@ import {
   hasSubdirs,
   getTranslationKey
 } from '../utils/transloco';
-import {SchemaOptions} from './schema';
+import { SchemaOptions } from './schema';
 const fs = require('fs-extra');
+const builder = require('xmlbuilder');
+const flat = require('flat');
 
 type Builder = (tree: Tree, path: string, content: Object) => void;
 
@@ -39,8 +41,7 @@ function reduceTranslations(host: Tree, dirPath: string, translationJson, lang: 
 }
 
 function deletePrevFiles(host: Tree, options: SchemaOptions) {
-
-  if(fs.existsSync(options.outDir)) {
+  if (fs.existsSync(options.outDir)) {
     fs.removeSync(options.outDir);
   }
 }
@@ -48,6 +49,41 @@ function deletePrevFiles(host: Tree, options: SchemaOptions) {
 const jsonBuilder: Builder = (tree: Tree, path: string, content: Object) => {
   tree.create(`${path}.json`, JSON.stringify(content, null, 2));
 };
+
+function buildXLIFF(tree: Tree, path: string, translationJSON: Object) {
+  translationJSON = flat(translationJSON);
+  let xml = builder
+    .create('xliff')
+    .attribute('version', '1.2')
+    .attribute('xmlns', 'urn:oasis:names:tc:xliff:document:1.2')
+    .ele('file', {
+      'source-language': 'en',
+      datatype: 'plaintext',
+      original: 'transloco.template'
+    });
+
+  Object.keys(translationJSON).forEach(translationKey => {
+    const value = translationJSON[translationKey];
+    if (isDescription(translationKey) === false) {
+      xml
+        .ele('trans-unit', { id: translationKey, datatype: 'html' })
+        .ele('source', {}, value)
+        .up()
+        .ele('note', { priority: '1', from: 'comment' }, findDescription(translationJSON, translationKey));
+    }
+  });
+
+  tree.create(`${path}.xliff`, xml.end({ pretty: true }));
+}
+
+function findDescription(translation, key) {
+  return translation[`${key}.comment`] || 'Empty';
+}
+
+function isDescription(key) {
+  const splitted = key.split('.');
+  return splitted.length > 1 && splitted.pop() === 'comment';
+}
 
 function builderFactory(format: TranslationFileFormat): Builder {
   switch (format) {
@@ -57,8 +93,7 @@ function builderFactory(format: TranslationFileFormat): Builder {
       // TODO:
       return jsonBuilder;
     case TranslationFileFormat.XLIFF:
-      // TODO:
-      return jsonBuilder;
+      return buildXLIFF;
     default:
       return jsonBuilder;
   }
@@ -66,7 +101,6 @@ function builderFactory(format: TranslationFileFormat): Builder {
 
 export default function(options: SchemaOptions): Rule {
   return (host: Tree, context: SchematicContext) => {
-
     deletePrevFiles(host, options);
     const root = getTranslationsRoot(host, options);
     const rootTranslations = getTranslationFiles(host, root);

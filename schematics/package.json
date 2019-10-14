@@ -18,6 +18,8 @@
     "@ngneat/transloco-utils": "^1.0.2",
     "@schematics/angular": ">=7.3.9 <9.0.0",
     "fs-extra": "^8.1.0",
+    "xmlbuilder": "^13.0.2",
+    "flat": "^4.1.0",
     "glob": "^7.1.4",
     "jasmine": "^3.3.1",
     "ora": "^3.4.0",

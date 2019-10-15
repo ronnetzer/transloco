@@ -1,17 +1,15 @@
-import { Rule, Tree, SchematicContext } from '@angular-devkit/schematics';
-import { TranslationFileFormat } from '../types';
+import { Rule, Tree } from '@angular-devkit/schematics';
 import {
-  getTranslationsRoot,
   getTranslationEntryPaths,
   getTranslationFiles,
+  getTranslationKey,
+  getTranslationsRoot,
   hasFiles,
-  setFileContent,
   hasSubdirs,
-  getTranslationKey
+  setFileContent
 } from '../utils/transloco';
 import { SchemaOptions } from './schema';
-
-type Parser = (content: string) => any;
+import { getParser } from './parser-factory';
 
 function reduceTranslations(host: Tree, dirPath: string, translationJson, lang: string, key = '') {
   const dir = host.getDir(dirPath);
@@ -36,25 +34,10 @@ function reduceTranslations(host: Tree, dirPath: string, translationJson, lang: 
   return translationJson;
 }
 
-function parserFactory(format: TranslationFileFormat): Parser {
-  switch (format) {
-    case TranslationFileFormat.JSON:
-      return JSON.parse;
-    case TranslationFileFormat.PO:
-    // TODO:
-    // return jsonBuilder;
-    case TranslationFileFormat.XLIFF:
-    // TODO:
-    // return jsonBuilder;
-    default:
-      return JSON.parse;
-  }
-}
-
 export default function(options: SchemaOptions): Rule {
-  return (host: Tree, context: SchematicContext) => {
+  return (host: Tree) => {
     const root = getTranslationsRoot(host, options);
-    const parser = parserFactory(options.format);
+    const parser = getParser(options.format, options);
 
     const translatedFiles = getTranslationFiles(host, options.source, parser);
     const translationEntryPaths = getTranslationEntryPaths(host, root);

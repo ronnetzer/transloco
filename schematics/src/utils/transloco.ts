@@ -2,6 +2,8 @@ import { PathFragment } from '@angular-devkit/core';
 import { DirEntry, Tree } from '@angular-devkit/schematics';
 import { getConfig as getTranslocoConfig, TranslocoConfig } from '@ngneat/transloco-utils';
 import { getProject } from './projects';
+import { TranslationParser } from '../spill/parser';
+import { JSONParser } from '../spill/parsers/json';
 
 const p = require('path');
 
@@ -9,8 +11,8 @@ export function getConfig(): TranslocoConfig {
   return getTranslocoConfig();
 }
 
-export function getJsonFileContent(fileName: PathFragment, dir: DirEntry, parser = JSON.parse) {
-  return parser(dir.file(fileName).content.toString('utf-8'));
+export function getJSONFileContent(fileName: PathFragment, dir: DirEntry, parser: TranslationParser) {
+  return (parser || new JSONParser({} as any)).parse(dir.file(fileName).content.toString('utf-8'));
 }
 
 export function setFileContent(host: Tree, dirPath: string, fileName: PathFragment, content) {
@@ -46,7 +48,7 @@ export function getTranslationFiles(host: Tree, root: string, parser?): { lang: 
   const rootDir = host.getDir(root);
   return rootDir.subfiles.map(fileName => ({
     lang: fileName.split('.')[0],
-    translation: getJsonFileContent(fileName, rootDir, parser)
+    translation: getJSONFileContent(fileName, rootDir, parser)
   }));
 }
 

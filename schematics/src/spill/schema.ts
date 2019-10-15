@@ -18,4 +18,5 @@ export interface SchemaOptions extends Schema {
    * The root project name.
    */
   project: string;
+  projectName?: string;
 }

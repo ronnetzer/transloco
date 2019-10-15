@@ -16,16 +16,31 @@
       "default": "dist-i18n",
       "alias": "o"
     },
+    "mainLang": {
+      "type": "string",
+      "description": "The main language.",
+      "default": "en",
+      "alias": "l"
+    },
     "format": {
       "description": "The output translation files format.",
       "type": "string",
       "default": "JSON",
-      "enum": ["JSON", "xliff", "po"],
+      "enum": ["JSON", "xliff"],
       "alias": "f"
+    },
+    "projectName": {
+      "type": "string",
+      "description": "The original attribute for the file",
+      "default": "transloco"
     },
     "project": {
       "type": "string",
       "description": "The root project name."
+    },
+    "missingTranslationValue": {
+      "type": "string",
+      "default": "Missing translation"
     }
   },
   "required": []

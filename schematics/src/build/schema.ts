@@ -1,5 +1,5 @@
 import { Schema } from '@schematics/angular/module/schema';
-import {TranslationFileFormat} from '../types';
+import { TranslationFileFormat } from '../types';
 
 export interface SchemaOptions extends Schema {
   /**
@@ -11,6 +11,10 @@ export interface SchemaOptions extends Schema {
    */
   outDir: string;
   /**
+   * The main language, defaults to en.
+   */
+  mainLang?: string;
+  /**
    *
    */
   format?: TranslationFileFormat;
@@ -18,4 +22,9 @@ export interface SchemaOptions extends Schema {
    * The root project name.
    */
   project?: string;
+  /**
+   * The original name for the file
+   */
+  projectName?: string;
+  missingTranslationValue?: string;
 }

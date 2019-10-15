@@ -26,6 +26,11 @@
     "project": {
       "type": "string",
       "description": "The root project name."
+    },
+    "projectName": {
+      "type": "string",
+      "description": "The original attribute for the file",
+      "default": "transloco"
     }
   },
   "required": []

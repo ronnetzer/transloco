@@ -1,20 +1,19 @@
-import { Rule, Tree, SchematicContext, SchematicsException, EmptyTree } from '@angular-devkit/schematics';
-import { TranslationFileFormat } from '../types';
+import { EmptyTree, Rule, SchematicsException, Tree } from '@angular-devkit/schematics';
 import {
-  getTranslationsRoot,
-  getTranslationFiles,
+  getJSONFileContent,
   getTranslationEntryPaths,
+  getTranslationFiles,
+  getTranslationKey,
+  getTranslationsRoot,
   hasFiles,
-  getJsonFileContent,
-  hasSubdirs,
-  getTranslationKey
+  hasSubdirs
 } from '../utils/transloco';
 import { SchemaOptions } from './schema';
-const fs = require('fs-extra');
-const builder = require('xmlbuilder');
-const flat = require('flat');
+import { getBuilder } from './builder-factory';
+import { TranslationFileFormat } from '../types';
+import { JSONParser } from '../spill/parsers/json';
 
-type Builder = (tree: Tree, path: string, content: Object) => void;
+const fs = require('fs-extra');
 
 function reduceTranslations(host: Tree, dirPath: string, translationJson, lang: string, key = '') {
   const dir = host.getDir(dirPath);
@@ -27,7 +26,7 @@ function reduceTranslations(host: Tree, dirPath: string, translationJson, lang: 
           `key: ${key} is already exist in translation file, please rename it and rerun the command.`
         );
       }
-      translationJson[key] = getJsonFileContent(fileName, dir);
+      translationJson[key] = getJSONFileContent(fileName, dir, new JSONParser({} as any));
     });
   if (hasSubdirs(dir)) {
     dir.subdirs.forEach(subDirName => {
@@ -40,73 +39,20 @@ function reduceTranslations(host: Tree, dirPath: string, translationJson, lang: 
   return translationJson;
 }
 
-function deletePrevFiles(host: Tree, options: SchemaOptions) {
-  if (fs.existsSync(options.outDir)) {
-    fs.removeSync(options.outDir);
-  }
-}
-
-const jsonBuilder: Builder = (tree: Tree, path: string, content: Object) => {
-  tree.create(`${path}.json`, JSON.stringify(content, null, 2));
-};
-
-function buildXLIFF(tree: Tree, path: string, translationJSON: Object) {
-  translationJSON = flat(translationJSON);
-  let xml = builder
-    .create('xliff')
-    .attribute('version', '1.2')
-    .attribute('xmlns', 'urn:oasis:names:tc:xliff:document:1.2')
-    .ele('file', {
-      'source-language': 'en',
-      datatype: 'plaintext',
-      original: 'transloco.template'
-    });
-
-  Object.keys(translationJSON).forEach(translationKey => {
-    const value = translationJSON[translationKey];
-    if (isDescription(translationKey) === false) {
-      xml
-        .ele('trans-unit', { id: translationKey, datatype: 'html' })
-        .ele('source', {}, value)
-        .up()
-        .ele('note', { priority: '1', from: 'comment' }, findDescription(translationJSON, translationKey));
-    }
-  });
-
-  tree.create(`${path}.xliff`, xml.end({ pretty: true }));
-}
-
-function findDescription(translation, key) {
-  return translation[`${key}.comment`] || 'Empty';
-}
-
-function isDescription(key) {
-  const splitted = key.split('.');
-  return splitted.length > 1 && splitted.pop() === 'comment';
-}
-
-function builderFactory(format: TranslationFileFormat): Builder {
-  switch (format) {
-    case TranslationFileFormat.JSON:
-      return jsonBuilder;
-    case TranslationFileFormat.PO:
-      // TODO:
-      return jsonBuilder;
-    case TranslationFileFormat.XLIFF:
-      return buildXLIFF;
-    default:
-      return jsonBuilder;
+function deletePrevFiles(host: Tree, outDir: string) {
+  if (fs.existsSync(outDir)) {
+    fs.removeSync(outDir);
   }
 }
 
 export default function(options: SchemaOptions): Rule {
-  return (host: Tree, context: SchematicContext) => {
-    deletePrevFiles(host, options);
+  return (host: Tree) => {
+    deletePrevFiles(host, options.outDir);
     const root = getTranslationsRoot(host, options);
     const rootTranslations = getTranslationFiles(host, root);
     const translationEntryPaths = getTranslationEntryPaths(host, root);
 
-    const output = rootTranslations.map(t => ({
+    let output = rootTranslations.map(t => ({
       lang: t.lang,
       translation: translationEntryPaths.reduce((acc, path) => {
         return reduceTranslations(host, path.path, t.translation, t.lang, path.scope);
@@ -114,9 +60,18 @@ export default function(options: SchemaOptions): Rule {
     }));
 
     const treeSource = new EmptyTree();
-    const builder = builderFactory(options.format);
+    const builder = getBuilder(options.format);
+
+    if (options.format === TranslationFileFormat.XLIFF) {
+      // The main language should always be first
+      output = output.sort(a => (a.lang === options.mainLang ? -1 : 1));
+    }
+
     output.forEach(o => {
-      builder(treeSource, `${options.outDir}/${o.lang}`, o.translation);
+      builder.build(treeSource, {
+        ...options,
+        ...o
+      });
     });
 
     return treeSource;

@@ -9,7 +9,7 @@
 After:
 
 ```html
-{{ t('a.b') }} {{ t('hello') }} {{ t('someKey', { value: 'value') }}
+{{ t('a.b') }} {{ t('hello') }} {{ t('someKey', { value: 'value' }) }}
 ```
 
 - Dedicated method for when you need to query an object instead of a key:
@@ -35,7 +35,7 @@ We also made minor changes in `TranslocoConfig`:
 {
   provide: TRANSLOCO_CONFIG,
   useValue: {
-    availabeLangs: ['en', 'es'],
+    availableLangs: ['en', 'es'],
     reRenderOnLangChange: true
   }
 }

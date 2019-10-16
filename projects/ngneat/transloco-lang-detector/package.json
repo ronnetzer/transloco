@@ -1,0 +1,27 @@
+{
+  "name": "@ngneat/transloco-lang-detector",
+  "description": "language detector used in browser environment for Transloco",
+  "version": "1.0.0",
+  "keywords": [
+    "transloco",
+    "i18n",
+    "language detector",
+    "angular",
+    "angular 2",
+    "angular translate",
+    "angular i18n",
+    "transloco"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ngneat/transloco/issues"
+  },
+  "homepage": "https://github.com/ngneat/transloco/tree/master/projects/ngneat/transloco-lang-detector#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ngneat/transloco"
+  }
+}

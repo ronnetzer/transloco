@@ -10,6 +10,7 @@ import { OnPushComponent } from './on-push/on-push.component';
 import { httpLoader } from './loaders/http.loader';
 import { environment } from '../environments/environment';
 import { TranslocoMessageFormatModule } from '@ngneat/transloco-messageformat';
+import { TranslocoLangDetectorModule } from '../../projects/ngneat/transloco-lang-detector/src/lib/lang-detector.module';
 
 @NgModule({
   declarations: [AppComponent, HomeComponent, OnPushComponent],
@@ -25,6 +26,7 @@ import { TranslocoMessageFormatModule } from '@ngneat/transloco-messageformat';
         es: 'es-ES'
       }
     })
+    // TranslocoLangDetectorModule.init(),
     // TranslocoPreloadLangsModule.preload(['es', 'todos-page'])
     // TranslocoPersistLangModule.init({
     //   getLangFn,

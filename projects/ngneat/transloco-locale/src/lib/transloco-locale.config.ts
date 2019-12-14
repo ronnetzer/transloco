@@ -32,7 +32,15 @@ export const defaultConfig: TranslocoLocaleConfig = {
   langToLocaleMapping: {}
 };
 
-export const LOCALE_DEFAULT_LOCALE = new InjectionToken<NumberFormatOptions>('DEFAULT_LOCALE');
-export const LOCALE_LANG_MAPPING = new InjectionToken<HashMap<Locale>>('LOCALE_LANG_MAPPING');
-export const LOCALE_CONFIG = new InjectionToken<HashMap<LocaleFormatOptions>>('LOCALE_CONFIG');
-export const LOCALE_CURRENCY_MAPPING = new InjectionToken<HashMap<Currency>>('LOCALE_CURRENCY_MAPPING');
+export const LOCALE_DEFAULT_LOCALE = new InjectionToken<Locale>('DEFAULT_LOCALE', {
+  factory: () => defaultConfig.defaultLocale
+});
+export const LOCALE_LANG_MAPPING = new InjectionToken<HashMap<Locale>>('LOCALE_LANG_MAPPING', {
+  factory: () => defaultConfig.langToLocaleMapping
+});
+export const LOCALE_CONFIG = new InjectionToken<LocaleConfig>('LOCALE_CONFIG', {
+  factory: () => defaultConfig.localeConfig
+});
+export const LOCALE_CURRENCY_MAPPING = new InjectionToken<HashMap<Currency>>('LOCALE_CURRENCY_MAPPING', {
+  factory: () => defaultConfig.localeToCurrencyMapping
+});

@@ -1,6 +1,6 @@
-import {Injectable, Inject, OnDestroy} from '@angular/core';
+import { Injectable, Inject, OnDestroy } from '@angular/core';
 import { TranslocoService, HashMap } from '@ngneat/transloco';
-import {Observable, BehaviorSubject, Subscription} from 'rxjs';
+import { Observable, BehaviorSubject, Subscription } from 'rxjs';
 import { map, distinctUntilChanged, filter } from 'rxjs/operators';
 import { isLocaleFormat } from './helpers';
 import { LOCALE_LANG_MAPPING, LOCALE_DEFAULT_LOCALE } from './transloco-locale.config';
@@ -9,7 +9,7 @@ import { Locale } from './transloco-locale.types';
 @Injectable({
   providedIn: 'root'
 })
-export class TranslocoLocaleService implements OnDestroy{
+export class TranslocoLocaleService implements OnDestroy {
   localeChanges$: Observable<Locale>;
   private locale: BehaviorSubject<Locale>;
   private _locale: Locale | null;
@@ -20,7 +20,7 @@ export class TranslocoLocaleService implements OnDestroy{
     @Inject(LOCALE_LANG_MAPPING) private langLocaleMapping: HashMap<Locale>,
     @Inject(LOCALE_DEFAULT_LOCALE) private defaultLocale: Locale
   ) {
-    this._locale = defaultLocale || this.toLocale(this.translocoService.getActiveLang());
+    this._locale = this.defaultLocale || this.toLocale(this.translocoService.getActiveLang());
     this.locale = new BehaviorSubject(this._locale);
     this.localeChanges$ = this.locale.asObservable().pipe(distinctUntilChanged());
 
